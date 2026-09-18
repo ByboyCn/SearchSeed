@@ -160,6 +160,15 @@
 
       <el-drawer v-model="drawer" :title="selected?.name" size="72%">
         <div v-if="selected">
+          <el-descriptions :column="7" border size="small" class="star-desc">
+            <el-descriptions-item label="类型">{{ selected.type }}</el-descriptions-item>
+            <el-descriptions-item label="光谱">{{ selected.spectr }} 型</el-descriptions-item>
+            <el-descriptions-item label="质量">{{ selected.starMass.toFixed(2) }} M☉</el-descriptions-item>
+            <el-descriptions-item label="半径">{{ selected.starRadius.toFixed(2) }} R☉</el-descriptions-item>
+            <el-descriptions-item label="光度">{{ selected.luminosity }} L</el-descriptions-item>
+            <el-descriptions-item label="表面温度">{{ Math.round(selected.temperature) }} K</el-descriptions-item>
+            <el-descriptions-item label="年龄">{{ (selected.age * 100).toFixed(0) }}%</el-descriptions-item>
+          </el-descriptions>
           <el-table :data="flatPlanets(selected)" row-key="name" default-expand-all>
             <el-table-column prop="name" label="行星" width="170" />
             <el-table-column prop="type" label="类型" width="95" />
@@ -369,5 +378,6 @@ body { margin: 0; background: #f5f7fa; color: #303133; }
 .vein-cell { display: flex; justify-content: space-between; background: #f0f2f5; border-radius: 4px; padding: 4px 8px; }
 .pv { font-size: 12px; }
 .gas { font-size: 12px; color: #67c23a; }
+.star-desc { margin-bottom: 10px; }
 .tag { margin: 1px; }
 </style>

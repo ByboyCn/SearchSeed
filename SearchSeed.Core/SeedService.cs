@@ -86,6 +86,8 @@ public class SeedService
                 Distance = (star.Position - g.Stars[0].Position).Magnitude,
                 PlanetCount = star.PlanetCount,
                 SafetyFactor = star.SafetyFactor, HivePatternLevel = star.HivePatternLevel,
+                StarMass = star.Mass, Spectr = star.Spectr.ToString(),
+                StarRadius = star.Radius, Temperature = star.Temperature, Age = star.Age,
             };
             long[] starVeins = new long[14]; ulong[] starAmount = new ulong[14];
             foreach (var planet in star.Planets)
@@ -192,6 +194,11 @@ public class StarResult
     public double[] PosLy = new double[3];
     public float SafetyFactor = 1.0f;
     public int HivePatternLevel;
+    public float StarMass;          // 质量（太阳质量）
+    public string Spectr = "";      // 光谱型
+    public float StarRadius;        // 恒星半径（太阳半径）
+    public float Temperature;       // 表面温度（K）
+    public float Age;               // 年龄（占主序寿命比例）
     public Dictionary<string, long> VeinsPoint = new();
     public Dictionary<string, ulong> VeinsAmount = new();
     public List<PlanetResult> Planets = new();
