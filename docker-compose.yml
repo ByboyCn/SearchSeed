@@ -1,0 +1,7 @@
+services:
+  searchseed:
+    build: .
+    container_name: searchseed
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:18090:8080"

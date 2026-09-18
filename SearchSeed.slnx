@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="SearchSeed.Api/SearchSeed.Api.csproj" />
+  <Project Path="SearchSeed.Core/SearchSeed.Core.csproj" />
+  <Project Path="SearchSeed.TestCli/SearchSeed.TestCli.csproj" />
+</Solution>
