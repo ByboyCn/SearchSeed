@@ -16,7 +16,7 @@ public class PrecomputeService : BackgroundService
     static readonly (int starNum, int resIdx)[] Priority =
     [
         (64, 4), (64, 5), (64, 3), (64, 6), (64, 7), (64, 8), (64, 2), (64, 1), (64, 0), (64, 9), (64, 10),
-        (32, 4), (128, 4), (256, 4), (48, 4),
+        (32, 4),
     ];
 
     public PrecomputeService(GalaxyStore store, SeedService seeds, IConfiguration cfg, ILogger<PrecomputeService> log)

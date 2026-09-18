@@ -58,7 +58,7 @@
             <el-input-number v-model="fromSeed" :min="0" :controls="false" size="small" style="width:120px" />
             <span class="lbl">恒星数</span>
             <el-select v-model="starNum" size="small" style="width:88px">
-              <el-option v-for="n in [32,48,64,128,256]" :key="n" :label="n" :value="n" />
+              <el-option v-for="n in [32,64]" :key="n" :label="n + ' 恒星'" :value="n" />
             </el-select>
             <span class="lbl">资源</span>
             <el-select v-model="resourceIndex" size="small" style="width:80px">
@@ -107,7 +107,7 @@
       <div class="toolbar">
         <el-input-number v-model="seedId" :min="0" :max="999999999" :controls="false" style="width:150px" placeholder="种子" />
         <el-select v-model="starNum" style="width:100px">
-          <el-option v-for="n in [32,48,64,128,256]" :key="n" :label="n + ' 恒星'" :value="n" />
+          <el-option v-for="n in [32,64]" :key="n" :label="n + ' 恒星'" :value="n" />
         </el-select>
         <el-select v-model="resourceIndex" style="width:100px">
           <el-option v-for="(r, i) in resourceNames" :key="i" :label="r" :value="i" />
