@@ -141,8 +141,8 @@
         <el-table-column prop="name" label="恒星" width="180" />
         <el-table-column prop="type" label="类型" width="110" />
         <el-table-column label="距离(ly)" width="90"><template #default="{ row }">{{ row.distance.toFixed(2) }}</template></el-table-column>
-        <el-table-column label="光度L" width="80"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
-        <el-table-column label="戴森圈L" width="90"><template #default="{ row }">{{ row.dysonLumino }}</template></el-table-column>
+        <el-table-column label="光度L" width="80"><template #default="{ row }">{{ row.dysonLumino }}</template></el-table-column>
+        <el-table-column label="太阳能L" width="90"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
         <el-table-column prop="planetCount" label="行星" width="60" />
         <el-table-column label="安全度" width="90">
           <template #default="{ row }">
@@ -165,7 +165,8 @@
             <el-descriptions-item label="光谱">{{ selected.spectr }} 型</el-descriptions-item>
             <el-descriptions-item label="质量">{{ selected.starMass.toFixed(2) }} M☉</el-descriptions-item>
             <el-descriptions-item label="半径">{{ selected.starRadius.toFixed(2) }} R☉</el-descriptions-item>
-            <el-descriptions-item label="光度">{{ selected.luminosity }} L</el-descriptions-item>
+            <el-descriptions-item label="光度">{{ selected.dysonLumino }} L</el-descriptions-item>
+            <el-descriptions-item label="太阳能光度">{{ selected.luminosity }} L</el-descriptions-item>
             <el-descriptions-item label="表面温度">{{ Math.round(selected.temperature) }} K</el-descriptions-item>
             <el-descriptions-item label="年龄">{{ (selected.age * 100).toFixed(0) }}%</el-descriptions-item>
           </el-descriptions>
