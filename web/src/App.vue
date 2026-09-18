@@ -84,7 +84,7 @@
               <el-tag v-else-if="jobId" size="small" type="warning">搜索中…</el-tag>
             </span>
           </template>
-          <el-table :data="matches" height="620" size="small">
+          <el-table :data="matches" height="calc(100vh - 190px)" size="small">
             <el-table-column label="种子" width="86">
               <template #default="{ row }">
                 <el-link type="primary" @click="viewSeed(row.seed, row.starNum)">{{ row.seed }}</el-link>
@@ -136,7 +136,7 @@
         </el-col>
       </el-row>
 
-      <el-table v-if="galaxy" :data="galaxy.stars" height="520" @row-click="selectStar" highlight-current-row>
+      <el-table v-if="galaxy" :data="galaxy.stars" height="calc(100vh - 320px)" @row-click="selectStar" highlight-current-row>
         <el-table-column prop="index" label="#" width="50" />
         <el-table-column prop="name" label="恒星" width="180" />
         <el-table-column prop="type" label="类型" width="110" />
@@ -169,7 +169,7 @@
             <el-descriptions-item label="表面温度">{{ Math.round(selected.temperature) }} K</el-descriptions-item>
             <el-descriptions-item label="年龄">{{ (selected.age * 100).toFixed(0) }}%</el-descriptions-item>
           </el-descriptions>
-          <el-table :data="flatPlanets(selected)" row-key="name" default-expand-all>
+          <el-table :data="flatPlanets(selected)" row-key="name" default-expand-all height="calc(100vh - 230px)">
             <el-table-column prop="name" label="行星" width="170" />
             <el-table-column prop="type" label="类型" width="95" />
             <el-table-column label="特性" width="140">
@@ -356,7 +356,8 @@ load()
 <style>
 body { margin: 0; background: #f5f7fa; color: #303133; }
 .page { max-width: 1500px; margin: 0 auto; padding: 16px; }
-.header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+  position: sticky; top: 0; z-index: 20; background: #f5f7fa; padding: 8px 0; }
 .header h1 { font-size: 20px; margin: 0; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .summary { margin-bottom: 12px; }
