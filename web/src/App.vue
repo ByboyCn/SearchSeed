@@ -94,7 +94,7 @@
             <el-table-column label="命中恒星">
               <template #default="{ row }">
                 <div v-for="s in row.stars" :key="s.index" class="hit">
-                  {{ s.name }} <span class="dim">{{ s.type }} · {{ s.distance.toFixed(1) }}ly · L{{ s.dysonLumino }}</span>
+                  {{ s.name }} <span class="dim">{{ s.type }} · {{ f6(s.distance) }}ly · L{{ s.dysonLumino }}</span>
                 </div>
               </template>
             </el-table-column>
@@ -139,8 +139,10 @@
       <el-table v-if="galaxy" :data="galaxy.stars" height="calc(100vh - 320px)" @row-click="selectStar" highlight-current-row>
         <el-table-column prop="index" label="#" width="50" />
         <el-table-column prop="name" label="恒星" width="180" />
-        <el-table-column prop="type" label="类型" width="110" />
-        <el-table-column label="距离(ly)" width="90"><template #default="{ row }">{{ row.distance.toFixed(2) }}</template></el-table-column>
+        <el-table-column prop="type" label="类型" width="110" column-key="type"
+          :filters="starTypeNames.map(t => ({ text: t, value: t }))"
+          :filter-method="(v, row) => row.type === v" />
+        <el-table-column label="距离(ly)" width="90"><template #default="{ row }">{{ f6(row.distance) }}</template></el-table-column>
         <el-table-column label="光度L" width="80"><template #default="{ row }">{{ row.dysonLumino }}</template></el-table-column>
         <el-table-column label="太阳能L" width="90"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
         <el-table-column prop="planetCount" label="行星" width="60" />
@@ -163,16 +165,18 @@
           <el-descriptions :column="7" border size="small" class="star-desc">
             <el-descriptions-item label="类型">{{ selected.type }}</el-descriptions-item>
             <el-descriptions-item label="光谱">{{ selected.spectr }} 型</el-descriptions-item>
-            <el-descriptions-item label="质量">{{ selected.starMass.toFixed(2) }} M☉</el-descriptions-item>
-            <el-descriptions-item label="半径">{{ selected.starRadius.toFixed(2) }} R☉</el-descriptions-item>
+            <el-descriptions-item label="质量">{{ f6(selected.starMass) }} M☉</el-descriptions-item>
+            <el-descriptions-item label="半径">{{ f6(selected.starRadius) }} R☉</el-descriptions-item>
             <el-descriptions-item label="光度">{{ selected.dysonLumino }} L</el-descriptions-item>
             <el-descriptions-item label="太阳能光度">{{ selected.luminosity }} L</el-descriptions-item>
             <el-descriptions-item label="表面温度">{{ Math.round(selected.temperature) }} K</el-descriptions-item>
-            <el-descriptions-item label="年龄">{{ (selected.age * 100).toFixed(0) }}%</el-descriptions-item>
+            <el-descriptions-item label="年龄">{{ f6(selected.age * 100) }}%</el-descriptions-item>
           </el-descriptions>
           <el-table :data="flatPlanets(selected)" row-key="name" default-expand-all height="calc(100vh - 230px)">
             <el-table-column prop="name" label="行星" width="170" />
-            <el-table-column prop="type" label="类型" width="95" />
+            <el-table-column prop="type" label="类型" width="95" column-key="type"
+              :filters="planetTypeNames.map(t => ({ text: t, value: t }))"
+              :filter-method="(v, row) => row.type === v" />
             <el-table-column label="特性" width="140">
               <template #default="{ row }">
                 <el-tag v-for="s in row.singularity" :key="s" size="small" class="tag" type="warning">{{ s }}</el-tag>
@@ -185,7 +189,7 @@
               <template #default="{ row }"><span class="dim">{{ row.landPercent < 0 ? '—' : Math.round(row.landPercent * 100) + '%' }}</span></template>
             </el-table-column>
             <el-table-column label="轨道半径" width="80">
-              <template #default="{ row }"><span class="dim">{{ row.orbitRadius.toFixed(2) }} AU</span></template>
+              <template #default="{ row }"><span class="dim">{{ f6(row.orbitRadius) }} AU</span></template>
             </el-table-column>
             <el-table-column label="公转周期" width="90">
               <template #default="{ row }"><span class="dim">{{ fmtPeriod(row.orbitalPeriodSec) }}</span></template>
@@ -194,13 +198,13 @@
               <template #default="{ row }"><span class="dim">{{ fmtPeriod(row.rotationPeriodSec) }}</span></template>
             </el-table-column>
             <el-table-column label="轨道倾角" width="80">
-              <template #default="{ row }"><span class="dim">{{ row.orbitInclination.toFixed(1) }}°</span></template>
+              <template #default="{ row }"><span class="dim">{{ f6(row.orbitInclination) }}°</span></template>
             </el-table-column>
             <el-table-column label="升交点经度" width="90">
-              <template #default="{ row }"><span class="dim">{{ row.orbitLongitude.toFixed(0) }}°</span></template>
+              <template #default="{ row }"><span class="dim">{{ f6(row.orbitLongitude) }}°</span></template>
             </el-table-column>
             <el-table-column label="地轴倾角" width="80">
-              <template #default="{ row }"><span class="dim">{{ row.obliquity.toFixed(1) }}°</span></template>
+              <template #default="{ row }"><span class="dim">{{ f6(row.obliquity) }}°</span></template>
             </el-table-column>
             <el-table-column label="大气成分" width="170">
               <template #default="{ row }">
@@ -237,6 +241,8 @@ const drawer = ref(false)
 const selected = ref(null)
 const resourceNames = ['0.1x','0.3x','0.5x','0.8x','1x','1.5x','2x','3x','5x','8x','无限']
 const veins = ['铁','铜','硅','钛','石','煤','油','可燃冰','金伯利矿石','分形硅石','有机晶体','光栅石','刺笋结晶','单极磁石']
+const starTypeNames = ['红巨星','黄巨星','蓝巨星','白巨星','白矮星','中子星','黑洞','A型恒星','B型恒星','F型恒星','G型恒星','K型恒星','M型恒星','O型恒星']
+const planetTypeNames = ['地中海','气态巨星','冰巨星','高产气巨','干旱荒漠','灰烬冻土','海洋丛林','熔岩','冰原冻土','贫瘠荒漠','戈壁','火山灰','红石','草原','水世界','黑石盐滩','樱林海','飓风石林','猩红冰湖','热带草原','橙晶荒漠','极寒冻土','潘多拉沼泽']
 
 function emptyGalaxy() { return { veins: { point: {}, amount: {} }, stars: [], planets: [] } }
 const cond = reactive(emptyGalaxy())
@@ -274,6 +280,8 @@ function flatPlanets(star) {
   }
   return out
 }
+
+function f6(v) { return v == null ? '—' : v.toFixed(6) }
 function fmtPeriod(sec) {
   if (sec == null) return '—'
   const abs = Math.abs(sec)
