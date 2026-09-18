@@ -70,6 +70,8 @@ public class StarClass
     public float AsterBelt1OrbitIndex, AsterBelt2OrbitIndex, AsterBelt1Radius, AsterBelt2Radius;
     public int PlanetCount;
     public float Level, ResourceCoef = 1.0f;
+    public float SafetyFactor = 1.0f;   // 官方 safetyFactor，越高越安全
+    public int HivePatternLevel;         // 0=安全(>=0.7) 1=中等(>=0.3) 2=高危
 
     public List<PlanetClass> Planets = [];
 

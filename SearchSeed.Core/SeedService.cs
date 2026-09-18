@@ -85,6 +85,7 @@ public class SeedService
                 PosLy = [star.Position.X, star.Position.Y, star.Position.Z],
                 Distance = (star.Position - g.Stars[0].Position).Magnitude,
                 PlanetCount = star.PlanetCount,
+                SafetyFactor = star.SafetyFactor, HivePatternLevel = star.HivePatternLevel,
             };
             long[] starVeins = new long[14]; ulong[] starAmount = new ulong[14];
             foreach (var planet in star.Planets)
@@ -184,6 +185,8 @@ public class StarResult
     public float Luminosity, DysonLumino, DysonRadius;
     public double Distance;
     public double[] PosLy = new double[3];
+    public float SafetyFactor = 1.0f;
+    public int HivePatternLevel;
     public Dictionary<string, long> VeinsPoint = new();
     public Dictionary<string, ulong> VeinsAmount = new();
     public List<PlanetResult> Planets = new();

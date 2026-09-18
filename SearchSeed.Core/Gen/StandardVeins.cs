@@ -208,9 +208,10 @@ public static class StandardVeins
                     veinAmount = Mathf.RoundToInt(veinAmount * galaxy.ResourceMultiplier);
                 else
                 {
+                    // 官方 GameDesc.oilAmountMultiplier：资源倍率<=0.1001 时 0.5，否则 1.0
+                    // 注意：官方无 2500 石油储量下限（C++ 移植版自加，此处以游戏为准）
                     float oilResourceMultiplier = galaxy.ResourceMultiplier <= 0.1001f ? 0.5f : 1.0f;
                     veinAmount = Mathf.RoundToInt(veinAmount * oilResourceMultiplier);
-                    if (veinAmount < 2500) veinAmount = 2500;
                 }
                 if (veinAmount < 1) veinAmount = 1;
                 if (galaxy.ResourceMultiplier >= 100.0f && eVeinType2 != EVeinType.Oil) veinAmount = 1000000000;

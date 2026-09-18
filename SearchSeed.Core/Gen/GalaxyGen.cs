@@ -652,6 +652,32 @@ public class GalaxyGen
         if (star.DysonRadius * 40000.0 < star.PhysicsRadius * 1.5)
             star.DysonRadius = (float)(star.PhysicsRadius * 1.5 / 40000.0);
         star.UPosition = star.Position * 2400000.0;
+
+        // ===== 官方安全度/黑雾等级（Assembly-CSharp StarGen.CreateStar 尾部）=====
+        // 注意：官方在消耗完 num3..y 共 8 个 double 后，再用 dotNet35Random2.Next() 派生
+        // dotNet35Random3 并取 num10——该额外消耗不影响其它数据（此后不再使用该链）
+        var rnd3 = new DotNet35Random(rnd2.Next());
+        double safetyJitter = rnd3.NextDouble();
+        float posMag = (float)pos.Magnitude;
+        float num16 = Mathf.Pow(star.Color, 1.3f);
+        float num17 = Mathf.Clamp((posMag - 2f) / 20f, 0f, 2.5f);
+        if (num17 > 1f)
+        {
+            num17 = Mathf.Log(num17) + 1.0f;
+            num17 = Mathf.Log(num17) + 1.0f;
+        }
+        num17 /= 1.4f;
+        if (star.Type == EStarType.BlackHole) num16 = 5f;
+        else if (star.Type == EStarType.NeutronStar) num16 = 1.7f;
+        else if (star.Type == EStarType.WhiteDwarf) num16 = 1.2f;
+        else if (star.Type == EStarType.GiantStar) num16 = Mathf.Max(0.6f, num16);
+        else if (star.Spectr == ESpectrType.O) num16 += 0.05f;
+        num16 *= 0.9f;
+        num16 += 0.07f;
+        float num18 = Mathf.Clamp01(1f - Mathf.Pow(num16, 0.73f) * Mathf.Pow(num17, 0.27f) + (float)safetyJitter * 0.08f - 0.04f);
+        star.SafetyFactor = num18;
+        star.HivePatternLevel = num18 >= 0.7f ? 0 : (num18 >= 0.3f ? 1 : 2);
+
         star.Name = NameGen.RandomStarName(seed1, star, Starnames);
         star.OverrideName = "";
     }

@@ -144,6 +144,13 @@
         <el-table-column label="光度L" width="80"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
         <el-table-column label="戴森圈L" width="90"><template #default="{ row }">{{ row.dysonLumino }}</template></el-table-column>
         <el-table-column prop="planetCount" label="行星" width="60" />
+        <el-table-column label="安全度" width="90">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.hivePatternLevel === 0 ? 'success' : row.hivePatternLevel === 1 ? 'warning' : 'danger'">
+              {{ Math.round(row.safetyFactor * 100) }}%
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column label="矿脉">
           <template #default="{ row }">
             <el-tag v-for="(v, name) in row.veinsPoint" :key="name" size="small" class="tag" type="info">{{ name }} {{ formatNum(v) }}</el-tag>
