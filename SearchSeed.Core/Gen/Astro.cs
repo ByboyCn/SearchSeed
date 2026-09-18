@@ -13,7 +13,8 @@ public class PlanetClass
     public float OrbitPhase, Obliquity;
     public double RotationPeriod = 480.0;
     public float RotationPhase, Radius = 200.0f, Scale = 1.0f, SunDistance;
-    public float HabitableBias, TemperatureBias, IonHeight, WindStrength, Luminosity, LandPercent;
+    public float HabitableBias, TemperatureBias, IonHeight, WindStrength, Luminosity;
+    public float LandPercent = -1f; // 适建区域 0~1；-1=未计算（快速模式）
     public double ModX, ModY;
     public float WaterHeight;
     public int WaterItemId;

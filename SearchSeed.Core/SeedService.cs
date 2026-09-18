@@ -123,6 +123,11 @@ public class SeedService
                     Gas = planet.GasItems.Zip(planet.GasSpeeds, (id, sp) => GasNames.GetValueOrDefault(id, id.ToString()) + " " + sp.ToString("0.00") + "/s").ToList(),
                     VeinsPoint = veinNames, VeinsAmount = amountNames,
                     IsGas = planet.GasItems.Count > 0,
+                    OrbitalPeriodSec = planet.OrbitalPeriod,
+                    RotationPeriodSec = planet.RotationPeriod,
+                    OrbitInclination = planet.OrbitInclination,
+                    OrbitLongitude = planet.OrbitLongitude,
+                    LandPercent = planet.GasItems.Count > 0 ? 0f : planet.LandPercent,
                 });
                 // 卫星挂到母行星下
                 if (planet.OrbitAroundPlanet != null)
@@ -208,4 +213,9 @@ public class PlanetResult
     public float RawDspDegree;
     public bool IsGas;
     public string Liquid = "";
+    public double OrbitalPeriodSec;     // 公转周期（秒）
+    public double RotationPeriodSec;    // 自转周期（秒，负值=反向自转）
+    public float OrbitInclination;      // 轨道倾角（度）
+    public float OrbitLongitude;        // 升交点经度（度）
+    public float LandPercent = -1f;     // 适建区域（0~1，-1=快速模式未计算）
 }

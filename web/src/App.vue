@@ -168,6 +168,30 @@
                 <el-tag v-for="s in row.singularity" :key="s" size="small" class="tag" type="warning">{{ s }}</el-tag>
               </template>
             </el-table-column>
+            <el-table-column label="海洋" width="70">
+              <template #default="{ row }"><span class="dim">{{ row.liquid || '—' }}</span></template>
+            </el-table-column>
+            <el-table-column label="适建区域" width="80">
+              <template #default="{ row }"><span class="dim">{{ row.landPercent < 0 ? '—' : Math.round(row.landPercent * 100) + '%' }}</span></template>
+            </el-table-column>
+            <el-table-column label="轨道半径" width="80">
+              <template #default="{ row }"><span class="dim">{{ row.orbitRadius.toFixed(2) }} AU</span></template>
+            </el-table-column>
+            <el-table-column label="公转周期" width="90">
+              <template #default="{ row }"><span class="dim">{{ fmtPeriod(row.orbitalPeriodSec) }}</span></template>
+            </el-table-column>
+            <el-table-column label="自转周期" width="90">
+              <template #default="{ row }"><span class="dim">{{ fmtPeriod(row.rotationPeriodSec) }}</span></template>
+            </el-table-column>
+            <el-table-column label="轨道倾角" width="80">
+              <template #default="{ row }"><span class="dim">{{ row.orbitInclination.toFixed(1) }}°</span></template>
+            </el-table-column>
+            <el-table-column label="升交点经度" width="90">
+              <template #default="{ row }"><span class="dim">{{ row.orbitLongitude.toFixed(0) }}°</span></template>
+            </el-table-column>
+            <el-table-column label="地轴倾角" width="80">
+              <template #default="{ row }"><span class="dim">{{ row.obliquity.toFixed(1) }}°</span></template>
+            </el-table-column>
             <el-table-column label="大气成分" width="170">
               <template #default="{ row }">
                 <div v-for="g in row.gas" :key="g" class="gas">{{ g }}</div>
@@ -239,6 +263,16 @@ function flatPlanets(star) {
     for (const m of (p.moons || [])) out.push({ ...m, name: '　└ ' + m.name })
   }
   return out
+}
+function fmtPeriod(sec) {
+  if (sec == null) return '—'
+  const abs = Math.abs(sec)
+  const sign = sec < 0 ? '-' : ''
+  if (abs >= 86400 * 30) return sign + (abs / 86400).toFixed(0) + '天'
+  if (abs >= 86400) return sign + (abs / 86400).toFixed(1) + '天'
+  if (abs >= 3600) return sign + (abs / 3600).toFixed(1) + '时'
+  if (abs >= 60) return sign + (abs / 60).toFixed(1) + '分'
+  return sign + abs.toFixed(0) + '秒'
 }
 function formatNum(n) {
   if (n >= 1e8) return (n / 1e8).toFixed(2) + '亿'
