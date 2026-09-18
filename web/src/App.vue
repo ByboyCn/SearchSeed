@@ -57,9 +57,9 @@
             <span class="lbl">起始种子</span>
             <el-input-number v-model="fromSeed" :min="0" :controls="false" size="small" style="width:120px" />
             <span class="lbl">恒星数</span>
-            <el-select v-model="starNum" size="small" style="width:88px">
-              <el-option v-for="n in [32,64]" :key="n" :label="n + ' 恒星'" :value="n" />
-            </el-select>
+            <el-input-number v-model="starNumFrom" :min="32" :max="64" :controls="false" size="small" style="width:64px" />
+            <span class="lbl">~</span>
+            <el-input-number v-model="starNumTo" :min="32" :max="64" :controls="false" size="small" style="width:64px" />
             <span class="lbl">资源</span>
             <el-select v-model="resourceIndex" size="small" style="width:80px">
               <el-option v-for="(r, i) in resourceNames" :key="i" :label="r" :value="i" />
@@ -85,11 +85,12 @@
             </span>
           </template>
           <el-table :data="matches" height="620" size="small">
-            <el-table-column label="种子" width="90">
+            <el-table-column label="种子" width="86">
               <template #default="{ row }">
-                <el-link type="primary" @click="viewSeed(row.seed)">{{ row.seed }}</el-link>
+                <el-link type="primary" @click="viewSeed(row.seed, row.starNum)">{{ row.seed }}</el-link>
               </template>
             </el-table-column>
+            <el-table-column prop="starNum" label="恒星" width="56" />
             <el-table-column label="命中恒星">
               <template #default="{ row }">
                 <div v-for="s in row.stars" :key="s.index" class="hit">
@@ -106,9 +107,8 @@
     <div v-show="tab === 'viewer'">
       <div class="toolbar">
         <el-input-number v-model="seedId" :min="0" :max="999999999" :controls="false" style="width:150px" placeholder="种子" />
-        <el-select v-model="starNum" style="width:100px">
-          <el-option v-for="n in [32,64]" :key="n" :label="n + ' 恒星'" :value="n" />
-        </el-select>
+        <el-input-number v-model="starNum" :min="32" :max="64" :controls="false" style="width:90px" />
+        <span class="lbl">恒星</span>
         <el-select v-model="resourceIndex" style="width:100px">
           <el-option v-for="(r, i) in resourceNames" :key="i" :label="r" :value="i" />
         </el-select>
@@ -224,7 +224,7 @@ async function load() {
   finally { loading.value = false }
 }
 function selectStar(row) { selected.value = row; drawer.value = true }
-function viewSeed(seed) { seedId.value = seed; tab.value = 'viewer'; load() }
+function viewSeed(seed, sn) { seedId.value = seed; if (sn) starNum.value = sn; tab.value = 'viewer'; load() }
 function flatPlanets(star) {
   const out = []
   for (const p of star.planets) {
@@ -241,6 +241,8 @@ function formatNum(n) {
 
 // ===== 搜索 =====
 const fromSeed = ref(0)
+const starNumFrom = ref(32)
+const starNumTo = ref(64)
 const searchMode = ref('fast')
 const jobId = ref(null)
 const job = ref(null)
@@ -263,7 +265,8 @@ function cleanTree(node) {
 
 async function startSearch() {
   const body = {
-    fromSeed: fromSeed.value, starNum: starNum.value, resourceIndex: resourceIndex.value,
+    fromSeed: fromSeed.value, starNumFrom: starNumFrom.value, starNumTo: starNumTo.value,
+    resourceIndex: resourceIndex.value,
     fastMode: searchMode.value === 'fast', maxResults: 200,
     conditions: {
       veins: cleanVeins(cond.veins),

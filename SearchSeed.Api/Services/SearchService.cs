@@ -15,11 +15,12 @@ public class SearchService
         _store = store; _seeds = seeds; _log = log;
     }
 
-    public SearchJob Start(GalaxyCond cond, long fromSeed, int starNum, int resIdx, bool fast, int maxResults)
+    public SearchJob Start(GalaxyCond cond, long fromSeed, int starNumFrom, int starNumTo, int resIdx, bool fast, int maxResults)
     {
         var job = new SearchJob
         {
-            Conditions = cond, FromSeed = fromSeed, StarNum = starNum,
+            Conditions = cond, FromSeed = fromSeed,
+            StarNumFrom = Math.Max(32, starNumFrom), StarNumTo = Math.Min(64, Math.Max(starNumFrom, starNumTo)),
             ResourceIndex = resIdx, FastMode = fast, MaxResults = maxResults,
         };
         Jobs[job.Id] = job;
@@ -29,7 +30,7 @@ public class SearchService
 
     void Run(SearchJob job)
     {
-        _log.LogInformation("搜索 {Id} 启动 from={From} starNum={N} fast={Fast}", job.Id, job.FromSeed, job.StarNum, job.FastMode);
+        _log.LogInformation("搜索 {Id} 启动 from={From} starNum={A}~{B} fast={Fast}", job.Id, job.FromSeed, job.StarNumFrom, job.StarNumTo, job.FastMode);
         try
         {
             const int batch = 128;
@@ -41,27 +42,31 @@ public class SearchService
                 Parallel.ForEach(range, new ParallelOptions { MaxDegreeOfParallelism = 4 }, seed =>
                 {
                     if (job.Stopped || job.Matches.Count >= job.MaxResults) return;
-                    try
+                    for (int sn = job.StarNumFrom; sn <= job.StarNumTo; sn++)
                     {
-                        bool cached = _store.IsDone((int)seed, job.StarNum, job.ResourceIndex, job.FastMode);
-                        var g = _seeds.GetGalaxy((int)seed, job.StarNum, job.ResourceIndex, job.FastMode);
-                        Interlocked.Increment(ref job.Scanned);
-                        if (cached) Interlocked.Increment(ref job.Skipped);
-                        if (CondEval.Check(g, job.Conditions, out var hits))
+                        if (job.Stopped || job.Matches.Count >= job.MaxResults) return;
+                        try
                         {
-                            job.Matches.Enqueue(new SearchMatch
+                            bool cached = _store.IsDone((int)seed, sn, job.ResourceIndex, job.FastMode);
+                            var g = _seeds.GetGalaxy((int)seed, sn, job.ResourceIndex, job.FastMode);
+                            Interlocked.Increment(ref job.Scanned);
+                            if (cached) Interlocked.Increment(ref job.Skipped);
+                            if (CondEval.Check(g, job.Conditions, out var hits))
                             {
-                                Seed = (int)seed,
-                                Stars = hits.Select(s => new MatchedStar
+                                job.Matches.Enqueue(new SearchMatch
                                 {
-                                    Index = s.Index, Name = s.Name, Type = s.Type,
-                                    Distance = s.Distance, DysonLumino = s.DysonLumino,
-                                }).ToList(),
-                            });
-                            _log.LogInformation("搜索 {Id} 命中 seed={Seed}", job.Id, seed);
+                                    Seed = (int)seed, StarNum = sn,
+                                    Stars = hits.Select(s => new MatchedStar
+                                    {
+                                        Index = s.Index, Name = s.Name, Type = s.Type,
+                                        Distance = s.Distance, DysonLumino = s.DysonLumino,
+                                    }).ToList(),
+                                });
+                                _log.LogInformation("搜索 {Id} 命中 seed={Seed} starNum={N}", job.Id, seed, sn);
+                            }
                         }
+                        catch (Exception ex) { _log.LogError(ex, "搜索 {Id} seed={Seed} sn={N} 异常", job.Id, seed, sn); }
                     }
-                    catch (Exception ex) { _log.LogError(ex, "搜索 {Id} seed={Seed} 异常", job.Id, seed); }
                 });
             }
         }

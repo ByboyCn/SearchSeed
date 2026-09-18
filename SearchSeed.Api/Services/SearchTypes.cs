@@ -116,7 +116,8 @@ public class SearchJob
 {
     public string Id { get; } = Guid.NewGuid().ToString("N")[..12];
     public GalaxyCond Conditions { get; set; } = new();
-    public int StarNum { get; set; } = 64;
+    public int StarNumFrom { get; set; } = 64;
+    public int StarNumTo { get; set; } = 64;
     public int ResourceIndex { get; set; } = 4;
     public bool FastMode { get; set; } = true;
     public long FromSeed { get; set; }
@@ -132,6 +133,7 @@ public class SearchJob
 public class SearchMatch
 {
     public int Seed { get; set; }
+    public int StarNum { get; set; }
     public List<MatchedStar> Stars { get; set; } = new();
 }
 
