@@ -186,7 +186,7 @@
               <template #default="{ row }"><span class="dim">{{ row.liquid || '—' }}</span></template>
             </el-table-column>
             <el-table-column label="适建区域" width="80">
-              <template #default="{ row }"><span class="dim">{{ row.landPercent < 0 ? '—' : Math.round(row.landPercent * 100) + '%' }}</span></template>
+              <template #default="{ row }"><span class="dim">{{ row.landPercent < 0 ? '—' : (row.landPercent * 100).toFixed(6) + '%' }}</span></template>
             </el-table-column>
             <el-table-column label="轨道半径" width="80">
               <template #default="{ row }"><span class="dim">{{ f6(row.orbitRadius) }} AU</span></template>
