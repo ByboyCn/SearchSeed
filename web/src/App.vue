@@ -153,6 +153,12 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="海洋" width="130">
+          <template #default="{ row }">
+            <el-tag v-for="l in row.liquids" :key="l" size="small" class="tag" type="primary" effect="plain">{{ l }}</el-tag>
+            <span v-if="!row.liquids?.length" class="dim">—</span>
+          </template>
+        </el-table-column>
         <el-table-column label="矿脉">
           <template #default="{ row }">
             <el-tag v-for="(v, name) in row.veinsPoint" :key="name" size="small" class="tag" type="info">{{ name }} {{ formatNum(v) }}</el-tag>

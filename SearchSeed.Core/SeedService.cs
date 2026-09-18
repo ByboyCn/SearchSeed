@@ -138,6 +138,8 @@ public class SeedService
                     if (parent != null) parent.Moons.Add(sd.Planets[^1]);
                 }
             }
+            foreach (var p in sd.Planets.Concat(sd.Planets.SelectMany(m => m.Moons)))
+                if (!string.IsNullOrEmpty(p.Liquid) && !sd.Liquids.Contains(p.Liquid)) sd.Liquids.Add(p.Liquid);
             sd.VeinsPoint = ToDict(starVeins);
             sd.VeinsAmount = ToDictU(starAmount);
             res.Stars.Add(sd);
@@ -199,6 +201,7 @@ public class StarResult
     public float StarRadius;        // 恒星半径（太阳半径）
     public float Temperature;       // 表面温度（K）
     public float Age;               // 年龄（占主序寿命比例）
+    public List<string> Liquids = new();   // 该恒星系内出现的海洋类型
     public Dictionary<string, long> VeinsPoint = new();
     public Dictionary<string, ulong> VeinsAmount = new();
     public List<PlanetResult> Planets = new();
