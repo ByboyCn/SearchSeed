@@ -170,7 +170,7 @@
             </template>
             <el-tabs>
               <el-tab-pane label="3D 预览">
-                <Blueprint3D :buildings="bp3dBuildings" height="460px" @select="b3dSelect = $event" />
+                <Blueprint3D :buildings="bp3dBuildings" height="460px" @select="b3dSelect = $event" @dblselect="on3dDblSelect" />
                 <div v-if="b3dSelect" class="b3d-info">
                   <b>{{ b3dSelect.name }}</b> #{{ b3dSelect.index }}
                   坐标 X={{ b3dSelect.x.toFixed(1) }} Y={{ b3dSelect.y.toFixed(1) }}
@@ -510,6 +510,9 @@ function roleText(s2) {
   if (s2.remoteRole === 1) parts.push('星际供')
   if (s2.remoteRole === 2) parts.push('星际需')
   return parts.join('·') || '仓储'
+}
+function on3dDblSelect(b) {
+  if (b.station) openStation(b)
 }
 function openStation(row) {
   stationRow.value = row

@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
 const props = defineProps({ buildings: { type: Array, default: () => [] }, height: { type: String, default: '420px' } })
-const emit = defineEmits(['select'])
+const emit = defineEmits(['select', 'dblselect'])
 const container = ref(null)
 
 // 建筑类别 → 颜色
@@ -94,6 +94,8 @@ function onDblClick(ev) {
     controls.target.copy(hits[0].object.position)
     const d = camera.position.distanceTo(hits[0].object.position)
     camera.position.copy(hits[0].object.position).add(new THREE.Vector3(d * 0.2, d * 0.2, d * 0.2))
+    const b = boxByMesh.get(hits[0].object)
+    if (b) emit('dblselect', b)
   }
 }
 
