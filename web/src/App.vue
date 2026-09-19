@@ -158,6 +158,39 @@
           </el-card>
         </el-col>
       </el-row>
+
+      <!-- 蓝图编辑工具 -->
+      <el-card v-if="bp" shadow="never" class="bp-tools">
+        <template #header>蓝图工具（变换后生成新蓝图，复制回游戏即可使用）</template>
+        <el-form :inline="true" size="small">
+          <el-form-item label="平移">
+            X <el-input-number v-model="bpDx" :step="5" style="width:90px" />
+            Y <el-input-number v-model="bpDy" :step="5" style="width:90px" />
+            <el-button size="small" type="primary" plain @click="bpEdit('translate')">应用</el-button>
+          </el-form-item>
+          <el-form-item>
+            <el-button size="small" @click="bpEdit('mirrorH')">左右镜像</el-button>
+            <el-button size="small" @click="bpEdit('mirrorV')">上下镜像</el-button>
+            <el-button size="small" @click="bpEdit('rotate', 1)">旋转90°</el-button>
+            <el-button size="small" @click="bpEdit('rotate', 2)">旋转180°</el-button>
+            <el-button size="small" type="warning" plain @click="bpNoBelt">无带流（删传送带+分拣器）</el-button>
+          </el-form-item>
+          <el-form-item label="改名">
+            <el-input v-model="bpName" style="width:180px" placeholder="留空不改" />
+            <el-button size="small" type="primary" plain @click="bpEdit(null)">生成新蓝图</el-button>
+          </el-form-item>
+        </el-form>
+        <el-divider>垂直叠加第二份蓝图</el-divider>
+        <el-input v-model="bpSecond" type="textarea" :rows="3" placeholder="粘贴第二份蓝图文本，将叠加到当前蓝图下方（间隔 8 格）" />
+        <el-button size="small" type="primary" plain style="margin-top:6px" @click="bpEdit('stack')">叠加</el-button>
+
+        <el-divider content-position="left">结果蓝图（游戏内 Ctrl+V 粘贴）</el-divider>
+        <el-input v-if="bpExported" v-model="bpExported" type="textarea" :rows="4" readonly />
+        <div v-if="bpExported" style="margin-top:6px">
+          <el-button size="small" type="success" @click="copyBp">复制蓝图</el-button>
+          <span class="dim" style="margin-left:8px">{{ bpExportInfo }}</span>
+        </div>
+      </el-card>
     </div>
 
     <!-- ===== 查看器 ===== -->
@@ -362,6 +395,51 @@ function formatNum(n) {
 }
 
 // ===== 搜索 =====
+const bpModel = ref('')
+const bpDx = ref(0)
+const bpDy = ref(0)
+const bpName = ref('')
+const bpSecond = ref('')
+const bpExported = ref('')
+const bpExportInfo = ref('')
+
+async function bpEdit(op, quarter) {
+  bpLoading.value = true
+  try {
+    const payload = { Json: bpModel.value, Op: op, Quarter: quarter ?? 0, Dx: bpDx.value, Dy: bpDy.value }
+    if (op === 'stack') payload.RawText = bpSecond.value.trim()
+    if (bpName.value.trim()) { payload.NewName = bpName.value.trim(); payload.NewDesc = bp.desc || '' }
+    const res = await fetch('/api/blueprint/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!res.ok) throw new Error(await res.text())
+    const d = await res.json()
+    bpModel.value = d.json
+    bp.value = d.summary
+    bpExported.value = d.blueprint
+    bpExportInfo.value = d.summary.buildingCount + ' 建筑 · ' + d.summary.area.width + '×' + d.summary.area.height
+    ElMessage.success('已生成新蓝图')
+  } catch (e) { ElMessage.error('编辑失败: ' + e.message) }
+  finally { bpLoading.value = false }
+}
+async function bpNoBelt() {
+  bpLoading.value = true
+  try {
+    const payload = { Json: bpModel.value, Op: 'removeItems', ItemIds: [2001, 2002, 2003, 2011, 2012, 2013, 2014] }
+    if (bpName.value.trim()) { payload.NewName = bpName.value.trim(); payload.NewDesc = bp.desc || '' }
+    const res = await fetch('/api/blueprint/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!res.ok) throw new Error(await res.text())
+    const d = await res.json()
+    bpModel.value = d.json
+    bp.value = d.summary
+    bpExported.value = d.blueprint
+    bpExportInfo.value = d.summary.buildingCount + ' 建筑（已删带）'
+    ElMessage.success('已生成无带流蓝图')
+  } catch (e) { ElMessage.error(e.message) }
+  finally { bpLoading.value = false }
+}
+function copyBp() {
+  navigator.clipboard.writeText(bpExported.value).then(() => ElMessage.success('已复制，到游戏里 Ctrl+V 粘贴'))
+}
+
 const bpFile = ref(null)
 const bpText = ref('')
 const bpLoading = ref(false)
@@ -379,7 +457,10 @@ async function parseBlueprint() {
       res = await fetch('/api/blueprint', { method: 'POST', body: bpText.value.trim() })
     } else { ElMessage.warning('请选择文件或粘贴蓝图文本'); bpLoading.value = false; return }
     if (!res.ok) throw new Error(await res.text())
-    bp.value = await res.json()
+    const d = await res.json()
+    bp.value = d.summary
+    bpModel.value = d.json
+    bpExported.value = ''
   } catch (e) { ElMessage.error('解析失败: ' + e.message) }
   finally { bpLoading.value = false }
 }
@@ -474,6 +555,7 @@ body { margin: 0; background: #f5f7fa; color: #303133; }
 .pv { font-size: 12px; }
 .gas { font-size: 12px; color: #67c23a; }
 .star-desc { margin-bottom: 10px; }
+.bp-tools { margin-top: 12px; }
 .recipe { border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; }
 .r-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .r-flow { display: flex; align-items: center; gap: 12px; }
