@@ -17,7 +17,7 @@ RUN dotnet publish SearchSeed.Api -c Release -o /app /m:1
 FROM mcr.microsoft.com/dotnet/aspnet:10.0
 WORKDIR /app
 COPY --from=build /app .
-COPY --from=web /frontend/dist /app/wwwroot
+COPY --from=frontend /frontend/dist /app/wwwroot
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "SearchSeed.Api.dll"]
