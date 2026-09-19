@@ -355,6 +355,9 @@
             <el-option label="总矿脉数" value="__veinTotal" />
             <el-option v-for="v in veins" :key="v" :label="'星系 ' + v + ' 数量'" :value="'vp:' + v" />
             <el-option v-for="v in veins" :key="'a' + v" :label="'星系 ' + v + ' 储量'" :value="'va:' + v" />
+            <el-option label="海洋·有水（行星数）" value="ocean:水" />
+            <el-option label="海洋·有硫酸（行星数）" value="ocean:硫酸" />
+            <el-option label="海洋·有熔岩（行星数）" value="ocean:熔岩" />
             <el-option label="行星·最大适建区域" value="p:maxLand" />
             <el-option label="行星·最大轨道半径" value="p:maxOrbit" />
             <el-option label="行星·最高光度" value="p:maxLum" />
@@ -570,6 +573,7 @@ function sortVal(star, key) {
   if (key === 'p:maxOrbit') return planets.reduce((m, p) => Math.max(m, p.orbitRadius || 0), 0)
   if (key === 'p:maxLum') return planets.reduce((m, p) => Math.max(m, p.luminosity || 0), 0)
   if (key === 'p:maxWind') return planets.reduce((m, p) => Math.max(m, p.wind || 0), 0)
+  if (key.startsWith('ocean:')) { const n = key.slice(6); return (star.planets || []).filter(p2 => p2.liquid === n).length }
   if (key.startsWith('pvp:')) { const n = key.slice(4); return planets.reduce((m, p) => Math.max(m, p.veinsPoint?.[n] || 0), 0) }
   if (key.startsWith('pva:')) { const n = key.slice(4); return planets.reduce((m, p) => Math.max(m, Number(p.veinsAmount?.[n] || 0)), 0) }
   return star[key] ?? 0
