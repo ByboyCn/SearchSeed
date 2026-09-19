@@ -341,16 +341,35 @@
         </el-col>
       </el-row>
 
-      <el-table v-if="galaxy" :data="galaxy.stars" height="calc(100vh - 320px)" @row-click="selectStar" highlight-current-row>
+      <div v-if="galaxy" class="sort-bar">
+        <span class="lbl">排序：</span>
+        <el-select v-model="sortKey" size="small" style="width:120px">
+          <el-option label="默认（编号）" value="" />
+          <el-option label="距离（近→远）" value="distance" />
+          <el-option label="光度 L" value="dysonLumino" />
+          <el-option label="太阳能 L" value="luminosity" />
+          <el-option label="安全度" value="safetyFactor" />
+          <el-option label="行星数" value="planetCount" />
+          <el-option label="总矿脉数" value="__veinTotal" />
+          <el-option v-for="v in veins" :key="v" :label="v + ' 数量'" :value="'vp:' + v" />
+          <el-option v-for="v in veins" :key="'a' + v" :label="v + ' 储量'" :value="'va:' + v" />
+        </el-select>
+        <el-radio-group v-model="sortDir" size="small" style="margin-left:8px">
+          <el-radio-button value="desc">降序</el-radio-button>
+          <el-radio-button value="asc">升序</el-radio-button>
+        </el-radio-group>
+        <el-input v-model="starFilter" size="small" placeholder="按名称/类型筛选恒星" style="width:180px;margin-left:8px" clearable />
+      </div>
+      <el-table v-if="galaxy" :data="sortedStars" height="calc(100vh - 360px)" @row-click="selectStar" highlight-current-row>
         <el-table-column prop="index" label="#" width="50" />
         <el-table-column prop="name" label="恒星" width="180" />
         <el-table-column prop="type" label="类型" width="110" column-key="type"
           :filters="starTypeNames.map(t => ({ text: t, value: t }))"
           :filter-method="(v, row) => row.type === v" />
-        <el-table-column label="距离(ly)" width="90"><template #default="{ row }">{{ f6(row.distance) }}</template></el-table-column>
-        <el-table-column label="光度L" width="80"><template #default="{ row }">{{ row.dysonLumino }}</template></el-table-column>
-        <el-table-column label="太阳能L" width="90"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
-        <el-table-column prop="planetCount" label="行星" width="60" />
+        <el-table-column label="距离(ly)" width="90" sortable prop="distance"><template #default="{ row }">{{ f6(row.distance) }}</template></el-table-column>
+        <el-table-column label="光度L" width="80" sortable prop="dysonLumino"><template #default="{ row }">{{ row.dysonLumino }}</template></el-table-column>
+        <el-table-column label="太阳能L" width="90" sortable prop="luminosity"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
+        <el-table-column prop="planetCount" label="行星" width="60" sortable />
         <el-table-column label="安全度" width="90">
           <template #default="{ row }">
             <el-tag size="small" :type="row.hivePatternLevel === 0 ? 'success' : row.hivePatternLevel === 1 ? 'warning' : 'danger'">
@@ -396,7 +415,7 @@
             <el-table-column label="海洋" width="70">
               <template #default="{ row }"><span class="dim">{{ row.liquid || '—' }}</span></template>
             </el-table-column>
-            <el-table-column label="适建区域" width="80">
+            <el-table-column label="适建区域" width="80" sortable prop="landPercent">
               <template #default="{ row }"><span class="dim">{{ row.landPercent < 0 ? '—' : (row.landPercent * 100).toFixed(6) + '%' }}</span></template>
             </el-table-column>
             <el-table-column label="轨道半径" width="80">
@@ -422,7 +441,7 @@
                 <div v-for="g in row.gas" :key="g" class="gas">{{ g }}</div>
               </template>
             </el-table-column>
-            <el-table-column label="光度" width="65"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
+            <el-table-column label="光度" width="65" sortable prop="luminosity"><template #default="{ row }">{{ row.luminosity }}</template></el-table-column>
             <el-table-column label="风能" width="65"><template #default="{ row }">{{ row.wind }}</template></el-table-column>
             <el-table-column label="矿脉">
               <template #default="{ row }">
@@ -528,6 +547,24 @@ const bpName = ref('')
 const bpSecond = ref('')
 const bpExported = ref('')
 const bpExportInfo = ref('')
+
+const sortKey = ref('')
+const sortDir = ref('desc')
+const starFilter = ref('')
+const sortedStars = computed(() => {
+  if (!galaxy.value) return []
+  let arr = [...galaxy.value.stars]
+  const f = starFilter.value.trim().toLowerCase()
+  if (f) arr = arr.filter(x => x.name.toLowerCase().includes(f) || x.type.includes(f))
+  if (!sortKey.value) return arr
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  const key = sortKey.value
+  if (key === '__veinTotal') arr.sort((a, b) => dir * (Object.values(b.veinsPoint || {}).reduce((s2, v) => s2 + v, 0) - Object.values(a.veinsPoint || {}).reduce((s2, v) => s2 + v, 0)))
+  else if (key.startsWith('vp:')) { const n = key.slice(3); arr.sort((a, b) => dir * ((b.veinsPoint?.[n] || 0) - (a.veinsPoint?.[n] || 0))) }
+  else if (key.startsWith('va:')) { const n = key.slice(3); arr.sort((a, b) => dir * ((b.veinsAmount?.[n] || 0) - (a.veinsAmount?.[n] || 0))) }
+  else arr.sort((a, b) => dir * ((b[key] ?? 0) - (a[key] ?? 0)))
+  return arr
+})
 
 const b3dSelect = ref(null)
 const bp3dBuildings = computed(() => {
@@ -751,6 +788,7 @@ body { margin: 0; background: #f5f7fa; color: #303133; }
 .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
   position: sticky; top: 0; z-index: 20; background: #f5f7fa; padding: 8px 0; }
 .header h1 { font-size: 20px; margin: 0; }
+.sort-bar { display: flex; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .summary { margin-bottom: 12px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; }
