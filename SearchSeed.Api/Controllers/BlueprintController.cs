@@ -53,6 +53,10 @@ public class BlueprintController : ControllerBase
         public List<int> ItemIds { get; set; } = new();
         public string? NewName { get; set; }
         public string? NewDesc { get; set; }
+        // 物流塔编辑：Op = "station" / "swapStation"
+        public int? BuildingIndex { get; set; }
+        public StationParams.StationData? StationData { get; set; }
+        public bool ToInterstellar { get; set; }
     }
 
     // 编辑/变换 → 导出新蓝图文本
@@ -87,6 +91,31 @@ public class BlueprintController : ControllerBase
                     var second = _bp.Parse(rawBytes);
                     bp = BlueprintService.StackVertical(bp, second);
                     break;
+                case "station":
+                {
+                    if (req.BuildingIndex is not int bi || req.StationData is null) return BadRequest("缺少建筑编号或塔参数");
+                    var target = bp.Buildings.FirstOrDefault(x => x.Index == bi)
+                        ?? bp.Buildings.FirstOrDefault(x => bp.Buildings.IndexOf(x) + 1 == bi);
+                    if (target == null || target.ItemId is not (2103 or 2104 or 2316)) return BadRequest("指定的建筑不是物流塔");
+                    target.Parameters = StationParams.EncodeStation(req.StationData, target.Parameters);
+                    break;
+                }
+                case "swapStation":
+                {
+                    if (req.BuildingIndex is not int bi2) return BadRequest("缺少建筑编号");
+                    var target2 = bp.Buildings.FirstOrDefault(x => x.Index == bi2)
+                        ?? bp.Buildings.FirstOrDefault(x => bp.Buildings.IndexOf(x) + 1 == bi2);
+                    if (target2 == null || target2.ItemId is not (2103 or 2104)) return BadRequest("指定的建筑不是物流运输站");
+                    bool toInter = req.ToInterstellar;
+                    int newId = toInter ? 2104 : 2103;
+                    if (target2.ItemId == newId) break;
+                    target2.ItemId = newId;
+                    // 模型互换
+                    target2.ModelIndex += toInter ? 1 : -1;
+                    if (!toInter && target2.Parameters.Length >= 30)
+                        for (int si = 0; si < 6; si++) target2.Parameters[si * 6 + 2] = 0; // 星际→行星：清空星际供需
+                    break;
+                }
                 case null: break; // 仅改名/导出
                 default: return BadRequest("未知操作: " + req.Op);
             }
@@ -118,6 +147,8 @@ public class BlueprintController : ControllerBase
                 filterId = b.FilterId,
                 outputObjIdx = b.TempOutputObjIdx, inputObjIdx = b.TempInputObjIdx,
                 parameters = b.Parameters, content = b.Content,
+                station = (b.ItemId is 2103 or 2104 or 2316 && b.Parameters.Length >= 332)
+                    ? StationParams.DecodeStation(b.Parameters) : null,
             }),
         }, new JsonSerializerOptions { IncludeFields = true });
 

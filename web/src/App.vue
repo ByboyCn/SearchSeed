@@ -104,6 +104,48 @@
       </el-col>
     </el-row>
 
+    <!-- 物流塔编辑 -->
+    <el-dialog v-model="stationDlg" :title="'编辑 ' + (stationRow?.name || '') + ' #' + (stationRow?.index ?? '')" width="780px">
+      <el-form v-if="stationData" label-width="110px" size="small">
+        <el-divider content-position="left">存储槽</el-divider>
+        <div v-for="(s2, i) in stationData.storage" :key="i" class="st-row">
+          <span class="dim" style="width:44px">槽{{ i + 1 }}</span>
+          <el-select v-model="s2.itemId" filterable style="width:130px" placeholder="空">
+            <el-option :value="0" label="（空）" />
+            <el-option v-for="(n, id) in itemOptions" :key="id" :label="n" :value="Number(id)" />
+          </el-select>
+          <el-select v-model="s2.localRole" style="width:100px">
+            <el-option :value="0" label="本地仓储" /><el-option :value="1" label="本地供应" /><el-option :value="2" label="本地需求" />
+          </el-select>
+          <el-select v-model="s2.remoteRole" style="width:100px">
+            <el-option :value="0" label="星际仓储" /><el-option :value="1" label="星际供应" /><el-option :value="2" label="星际需求" />
+          </el-select>
+          <el-input-number v-model="s2.max" :min="0" :step="100" :controls="false" style="width:90px" placeholder="上限" />
+          <el-select v-model="s2.lockAmount" style="width:86px">
+            <el-option :value="0" label="不锁定" /><el-option :value="1" label="锁满仓" /><el-option :value="2" label="锁半仓" />
+          </el-select>
+        </div>
+        <el-divider content-position="left">运输设置</el-divider>
+        <div class="st-grid">
+          <el-form-item label="运输机起送"><el-input-number v-model="stationData.deliveryDronesPct" :min="1" :max="100" style="width:110px" /> %</el-form-item>
+          <el-form-item label="运输船起送"><el-input-number v-model="stationData.deliveryShipsPct" :min="1" :max="100" style="width:110px" /> %</el-form-item>
+          <el-form-item label="最大充能"><el-input-number v-model="stationData.workEnergyMW" :min="30" :max="300" style="width:110px" /> MW</el-form-item>
+          <el-form-item label="运输机航程"><el-input-number v-model="stationData.tripRangeDronesDeg" :min="20" :max="180" style="width:110px" /> °</el-form-item>
+          <el-form-item label="运输船航程"><el-input-number v-model="stationData.tripRangeShipsLy" :min="1" :max="10000" style="width:110px" /> ly</el-form-item>
+          <el-form-item label="曲速启用"><el-input-number v-model="stationData.warpEnableAu" :min="0.5" :max="60" :step="0.5" style="width:110px" /> AU</el-form-item>
+          <el-form-item label="集装数量"><el-input-number v-model="stationData.pilerCount" :min="0" :max="4" style="width:110px" />（0=科技上限）</el-form-item>
+          <el-form-item label="翘曲必备"><el-switch v-model="stationData.warperNecessary" /></el-form-item>
+          <el-form-item label="取轨道采集器"><el-switch v-model="stationData.includeOrbitCollector" /></el-form-item>
+          <el-form-item label="自动补无人机"><el-switch v-model="stationData.droneAutoReplenish" /></el-form-item>
+          <el-form-item label="自动补运输船"><el-switch v-model="stationData.shipAutoReplenish" /></el-form-item>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="stationDlg = false">取消</el-button>
+        <el-button type="primary" :loading="bpLoading" @click="saveStation">保存并生成新蓝图</el-button>
+      </template>
+    </el-dialog>
+
     <!-- ===== 蓝图解析 ===== -->
     <div v-show="tab === 'blueprint'">
       <el-row :gutter="12">
@@ -128,10 +170,29 @@
             </template>
             <el-tabs>
               <el-tab-pane label="建筑清单">
-                <el-table :data="bp.buildings" height="480" size="small">
+                <el-table :data="bpBuildings" height="480" size="small">
                   <el-table-column type="index" width="50" />
                   <el-table-column prop="name" label="建筑" />
                   <el-table-column prop="count" label="数量" width="90" sortable />
+                </el-table>
+              </el-tab-pane>
+              <el-tab-pane label="物流塔">
+                <el-table :data="bpStations" height="480" size="small">
+                  <el-table-column prop="index" label="#" width="60" />
+                  <el-table-column prop="name" label="类型" width="150" />
+                  <el-table-column label="存储槽">
+                    <template #default="{ row }">
+                      <el-tag v-for="(s2, i) in row.station.storage.filter(x => x.itemId)" :key="i" size="small" class="tag" :type="s2.localRole === 1 || s2.remoteRole === 1 ? 'success' : 'warning'">
+                        {{ itemName(s2.itemId) }} {{ roleText(s2) }}
+                      </el-tag>
+                    </template>
+                  </el-table-column>
+                  <el-table-column label="操作" width="180">
+                    <template #default="{ row }">
+                      <el-button size="small" type="primary" plain @click="openStation(row)">编辑</el-button>
+                      <el-button v-if="row.itemId === 2103 || row.itemId === 2104" size="small" @click="swapStation(row)">转{{ row.itemId === 2103 ? '星际' : '行星' }}塔</el-button>
+                    </template>
+                  </el-table-column>
                 </el-table>
               </el-tab-pane>
               <el-tab-pane :label="'流水线 (' + bp.recipes.length + ')'">
@@ -322,7 +383,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onUnmounted } from 'vue'
+import { ref, reactive, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import ConditionCard from './components/ConditionCard.vue'
 
@@ -402,6 +463,69 @@ const bpName = ref('')
 const bpSecond = ref('')
 const bpExported = ref('')
 const bpExportInfo = ref('')
+
+const stationDlg = ref(false)
+const stationRow = ref(null)
+const stationData = ref(null)
+const bpStations = computed(() => {
+  if (!bpModel.value) return []
+  try { return JSON.parse(bpModel.value).buildings.filter(b => b.station) } catch { return [] }
+})
+const bpBuildings = computed(() => bp.value?.buildings || [])
+const itemOptions = computed(() => ITEM_NAMES)
+
+const ITEM_NAMES = {
+  1001:'铁矿',1002:'铜矿',1003:'硅石',1004:'钛石',1005:'石矿',1006:'煤矿',1007:'可燃冰',1008:'金伯利矿石',1009:'分形硅石',1010:'有机晶体',
+  1011:'刺笋结晶',1110:'玻璃',1108:'石材',1101:'铁块',1102:'铜块',1103:'钢材',1104:'高纯硅块',1105:'钛块',1106:'磁铁',1107:'电磁涡轮',
+  1111:'金刚石',1112:'反物质',1120:'氢',1121:'重氢',1122:'反物质',1208:'光子',1210:'引力透镜',1401:'齿轮',1402:'电动机',1501:'电路板',
+  1502:'处理器',1503:'量子芯片',1601:'石墨烯',1602:'碳纳米管',1603:'粒子宽带',1701:'硫酸',1801:'混凝土',1802:'钛化玻璃',1901:'戴森球组件',
+  1902:'太阳帆',2001:'太阳帆',2011:'翘曲器',2201:'电力感应塔',2306:'电弧熔炉',
+}
+function itemName(id) { return ITEM_NAMES[id] || '物品#' + id }
+function roleText(s2) {
+  const parts = []
+  if (s2.localRole === 1) parts.push('本地供')
+  if (s2.localRole === 2) parts.push('本地需')
+  if (s2.remoteRole === 1) parts.push('星际供')
+  if (s2.remoteRole === 2) parts.push('星际需')
+  return parts.join('·') || '仓储'
+}
+function openStation(row) {
+  stationRow.value = row
+  stationData.value = JSON.parse(JSON.stringify(row.station))
+  stationDlg.value = true
+}
+async function saveStation() {
+  bpLoading.value = true
+  try {
+    const payload = { Json: bpModel.value, Op: 'station', BuildingIndex: stationRow.value.index, StationData: stationData.value,
+      NewName: bp.value.name, NewDesc: bp.value.desc || '' }
+    const res = await fetch('/api/blueprint/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!res.ok) throw new Error(await res.text())
+    const d = await res.json()
+    bpModel.value = d.json
+    bpExported.value = d.blueprint
+    bpExportInfo.value = '物流塔已修改'
+    stationDlg.value = false
+    ElMessage.success('已生成新蓝图，请在下方复制')
+  } catch (e) { ElMessage.error(e.message) }
+  finally { bpLoading.value = false }
+}
+async function swapStation(row) {
+  bpLoading.value = true
+  try {
+    const payload = { Json: bpModel.value, Op: 'swapStation', BuildingIndex: row.index, ToInterstellar: row.itemId === 2103,
+      NewName: bp.value.name, NewDesc: bp.value.desc || '' }
+    const res = await fetch('/api/blueprint/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!res.ok) throw new Error(await res.text())
+    const d = await res.json()
+    bpModel.value = d.json
+    bpExported.value = d.blueprint
+    bpExportInfo.value = '塔类型已互换'
+    ElMessage.success('已生成新蓝图')
+  } catch (e) { ElMessage.error(e.message) }
+  finally { bpLoading.value = false }
+}
 
 async function bpEdit(op, quarter) {
   bpLoading.value = true
@@ -556,6 +680,8 @@ body { margin: 0; background: #f5f7fa; color: #303133; }
 .gas { font-size: 12px; color: #67c23a; }
 .star-desc { margin-bottom: 10px; }
 .bp-tools { margin-top: 12px; }
+.st-row { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
+.st-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 12px; }
 .recipe { border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; }
 .r-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .r-flow { display: flex; align-items: center; gap: 12px; }
