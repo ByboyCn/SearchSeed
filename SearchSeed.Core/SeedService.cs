@@ -149,9 +149,10 @@ public class SeedService
         return res;
     }
 
+    // ThemeProto.WaterItemId（官方 ThemeProtoSet 实测）：0=无海洋 1=水(1000) 2=硫酸(1116) 4=熔岩(-1 岩浆海，不可抽取)
     public static readonly Dictionary<int, string> LiquidNames = new()
     {
-        [1] = "水", [2] = "硫酸", [3] = "重氢", [4] = "液氢", [5] = "原油", [6] = "液态甲烷",
+        [1] = "水", [2] = "硫酸", [4] = "熔岩",
     };
 
     public static readonly Dictionary<int, string> GasNames = new()
