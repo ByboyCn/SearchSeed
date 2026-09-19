@@ -47,6 +47,9 @@ public class BlueprintService
         public int Version = 2, Patch = 1;
         public int CursorOffsetX, CursorOffsetY, CursorTargetArea, DragBoxX, DragBoxY, PrimaryAreaIdx = -1;
         public string Layout = "0";
+        public string Flag0 = "0";       // 头部版本：0=旧（无作者字段）1=新（0.10.34+）
+        public int[] Icons = { 1110, 1110, 1110, 1110, 1110 };
+        public long TimeTick;
         public string GameVersion = "0.10.28.21219";
         public string ShortDesc = "";
         public string Desc = "";
@@ -70,6 +73,7 @@ public class BlueprintService
     public Blueprint Parse(byte[] data)
     {
         string gameVersion = "0.10.28.21219", shortDesc = "", desc = "";
+        string flag0 = "0"; long timeTick = 0; int[] icons = { 1110, 1110, 1110, 1110, 1110 };
         var head = Encoding.UTF8.GetString(data.Take(Math.Min(64, data.Length)).ToArray());
         if (head.StartsWith("BLUEPRINT:"))
         {
@@ -78,8 +82,11 @@ public class BlueprintService
             if (p1 < 0) throw new ArgumentException("蓝图文本格式无法识别");
             var cells = text[9..p1].Split(',');
             if (cells.Length < 12) throw new ArgumentException("蓝图头部字段不足");
-            var flag0 = cells[0];
+            flag0 = cells[0];
             if (cells.Length > 9) gameVersion = cells[9];
+            if (cells.Length > 8) long.TryParse(cells[8], out timeTick);
+            for (int ci = 0; ci < 5 && ci + 2 < cells.Length; ci++)
+                if (int.TryParse(cells[2 + ci], out var iv) && iv > 0) icons[ci] = iv;
             if (cells.Length > 10) shortDesc = Uri.UnescapeDataString(cells[10]);
             if (cells.Length > 11) desc = Uri.UnescapeDataString(cells[flag0 == "0" ? 11 : 14 < cells.Length ? 14 : cells.Length - 1]);
             var p2 = text.Length - 33;
@@ -98,6 +105,9 @@ public class BlueprintService
         bp.GameVersion = gameVersion;
         bp.ShortDesc = shortDesc;
         bp.Desc = desc;
+        bp.Flag0 = flag0;
+        bp.TimeTick = timeTick;
+        bp.Icons = icons;
         return bp;
     }
 
@@ -267,18 +277,26 @@ public class BlueprintService
             gz.Write(ms.ToArray());
         var b64 = Convert.ToBase64String(gzMs.ToArray());
 
-        long timeTick = (long)((DateTime.UtcNow - TimeBase).TotalMilliseconds * 10000);
+        long timeTick = bp.TimeTick != 0 ? bp.TimeTick : (long)(DateTime.UtcNow - TimeBase).Ticks;
         var sb = new StringBuilder();
-        sb.Append("BLUEPRINT:1,0,1110,1110,1110,1110,1110,0,").Append(timeTick).Append(',');
+        sb.Append("BLUEPRINT:").Append(bp.Flag0 == "1" ? "1" : "0").Append(",0");
+        foreach (var icon in bp.Icons) sb.Append(',').Append(icon);
+        sb.Append(",0,").Append(timeTick).Append(',');
         sb.Append(bp.GameVersion).Append(',');
         sb.Append(Uri.EscapeDataString(newName ?? bp.ShortDesc)).Append(',');
-        sb.Append(Uri.EscapeDataString("SearchSeed"));       // author
-        sb.Append(',').Append(Uri.EscapeDataString(""));      // customVersion
-        sb.Append(',').Append(Uri.EscapeDataString(""));      // externalFields
-        sb.Append(',').Append(Uri.EscapeDataString(newDesc ?? bp.Desc));
-        sb.Append('"').Append(b64).Append('"');
-        var md5 = Convert.ToHexString(MD5.HashData(Encoding.UTF8.GetBytes(sb.ToString()))).ToLowerInvariant();
-        return sb + md5;
+        if (bp.Flag0 == "1")
+        {
+            sb.Append(Uri.EscapeDataString("SearchSeed"));   // author
+            sb.Append(',').Append(Uri.EscapeDataString(""));  // customVersion
+            sb.Append(',').Append(Uri.EscapeDataString(""));  // externalFields
+            sb.Append(',');
+        }
+        sb.Append(Uri.EscapeDataString(newDesc ?? bp.Desc));
+        sb.Append('"').Append(b64);
+        // 官方 CheckSignature：MD5F(到 base64 结束，不含尾引号)，32 位大写，随后跟尾引号+签名
+        var md5 = Md5F.Compute(sb.ToString());
+        sb.Append('"').Append(md5);
+        return sb.ToString();
     }
 
     // ============ 统计与流水线 ============
