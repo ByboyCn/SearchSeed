@@ -57,6 +57,17 @@ public class BlueprintController : ControllerBase
         public int? BuildingIndex { get; set; }
         public StationParams.StationData? StationData { get; set; }
         public bool ToInterstellar { get; set; }
+        // 线性变换 / 垂直叠加 / 垂直偏移 / 水平拼接 / 垂直传送带
+        public double ZoomX { get; set; } = 1;
+        public double ZoomY { get; set; } = 1;
+        public double RotateDeg { get; set; }
+        public int Floors { get; set; } = 2;
+        public double Spacing { get; set; } = 3;
+        public bool Pile { get; set; } = true;
+        public double Dz { get; set; }
+        public string Align { get; set; } = "center";
+        public double StartZ { get; set; }
+        public double EndZ { get; set; }
     }
 
     // 编辑/变换 → 导出新蓝图文本
@@ -100,6 +111,26 @@ public class BlueprintController : ControllerBase
                     target.Parameters = StationParams.EncodeStation(req.StationData, target.Parameters);
                     break;
                 }
+                case "linear":
+                    BpTransforms.LinearTransform(bp, req.ZoomX, req.ZoomY, req.RotateDeg);
+                    break;
+                case "vstack":
+                    BpTransforms.VerticalCopy(bp, Math.Max(1, req.Floors), req.Spacing, req.Pile);
+                    break;
+                case "voffset":
+                    BpTransforms.VerticalOffsetZ(bp, req.Dz);
+                    break;
+                case "hstack":
+                    if (rawBytes is not { Length: > 0 }) return BadRequest("水平拼接需要第二份蓝图（rawText）");
+                    var secondH = _bp.Parse(rawBytes);
+                    BpTransforms.StackHorizontal(bp, secondH, req.Align);
+                    break;
+                case "vbelt":
+                    bp = BpTransforms.CreateVBelts(req.StartZ, req.EndZ);
+                    break;
+                case "snap":
+                    BpTransforms.SnapToGrid(bp);
+                    break;
                 case "swapStation":
                 {
                     if (req.BuildingIndex is not int bi2) return BadRequest("缺少建筑编号");

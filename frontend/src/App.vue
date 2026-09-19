@@ -248,16 +248,56 @@
             <el-button size="small" @click="bpEdit('mirrorV')">上下镜像</el-button>
             <el-button size="small" @click="bpEdit('rotate', 1)">旋转90°</el-button>
             <el-button size="small" @click="bpEdit('rotate', 2)">旋转180°</el-button>
-            <el-button size="small" type="warning" plain @click="bpNoBelt">无带流（删传送带+分拣器）</el-button>
+            <el-button size="small" type="warning" plain @click="bpNoBelt">无带流</el-button>
+            <el-button size="small" plain @click="bpEdit('snap')">格点吸附（修复不可放置）</el-button>
+          </el-form-item>
+          <el-form-item label="线性变换">
+            X缩放 <el-input-number v-model="bpZoomX" :step="0.5" :precision="1" style="width:95px" />
+            Y缩放 <el-input-number v-model="bpZoomY" :step="0.5" :precision="1" style="width:95px" />
+            旋转 <el-input-number v-model="bpRotate" :step="90" style="width:95px" /> °
+            <el-button size="small" type="primary" plain @click="bpEdit('linear')">应用</el-button>
+            <span class="dim">（负数=翻转；非±1缩放会自动吸附整格）</span>
+          </el-form-item>
+          <el-form-item label="垂直叠加">
+            层数 <el-input-number v-model="bpFloors" :min="1" :max="30" style="width:80px" />
+            Z间隔 <el-input-number v-model="bpSpacing" :min="0.5" :step="0.5" style="width:90px" />
+            <el-radio-group v-model="bpPile" size="small">
+              <el-radio-button :value="true">堆叠</el-radio-button>
+              <el-radio-button :value="false">独立</el-radio-button>
+            </el-radio-group>
+            <el-button size="small" type="primary" plain @click="bpEdit('vstack')">应用</el-button>
+            <span class="dim">（Z 轴多层，堆叠=箱体互通；悬空自动补地基）</span>
+          </el-form-item>
+          <el-form-item label="垂直偏移">
+            Z <el-input-number v-model="bpDz" :step="1" style="width:85px" />
+            <el-button size="small" type="primary" plain @click="bpEdit('voffset')">应用</el-button>
           </el-form-item>
           <el-form-item label="改名">
             <el-input v-model="bpName" style="width:180px" placeholder="留空不改" />
             <el-button size="small" type="primary" plain @click="bpEdit(null)">生成新蓝图</el-button>
           </el-form-item>
         </el-form>
-        <el-divider>垂直叠加第二份蓝图</el-divider>
-        <el-input v-model="bpSecond" type="textarea" :rows="3" placeholder="粘贴第二份蓝图文本，将叠加到当前蓝图下方（间隔 8 格）" />
-        <el-button size="small" type="primary" plain style="margin-top:6px" @click="bpEdit('stack')">叠加</el-button>
+        <el-divider>拼接第二份蓝图</el-divider>
+        <el-input v-model="bpSecond" type="textarea" :rows="3" placeholder="粘贴第二份蓝图文本" />
+        <el-form :inline="true" size="small" style="margin-top:6px">
+          <el-form-item label="水平对齐">
+            <el-radio-group v-model="bpAlign" size="small">
+              <el-radio-button value="top">顶对齐</el-radio-button>
+              <el-radio-button value="center">居中</el-radio-button>
+              <el-radio-button value="bottom">底对齐</el-radio-button>
+            </el-radio-group>
+            <el-button size="small" type="primary" plain @click="bpEdit('hstack')">左右拼接</el-button>
+            <el-button size="small" type="primary" plain @click="bpEdit('stack')">上下拼接</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-divider content-position="left">无中生有 · 无褶皱垂直传送带</el-divider>
+        <el-form :inline="true" size="small">
+          <el-form-item label="起点Z"><el-input-number v-model="bpVz1" :step="0.5" style="width:90px" /></el-form-item>
+          <el-form-item label="终点Z"><el-input-number v-model="bpVz2" :step="0.5" style="width:90px" /></el-form-item>
+          <el-form-item><el-button size="small" type="primary" plain @click="makeVbelt">生成</el-button>
+          <span class="dim">（生成新蓝图，不基于当前蓝图）</span></el-form-item>
+        </el-form>
 
         <el-divider content-position="left">结果蓝图（游戏内 Ctrl+V 粘贴）</el-divider>
         <el-input v-if="bpExported" v-model="bpExported" type="textarea" :rows="4" readonly />
@@ -472,6 +512,16 @@ function formatNum(n) {
 
 // ===== 搜索 =====
 const bpModel = ref('')
+const bpZoomX = ref(1)
+const bpZoomY = ref(1)
+const bpRotate = ref(0)
+const bpFloors = ref(2)
+const bpSpacing = ref(3)
+const bpPile = ref(true)
+const bpDz = ref(0)
+const bpAlign = ref('center')
+const bpVz1 = ref(0)
+const bpVz2 = ref(10)
 const bpDx = ref(0)
 const bpDy = ref(0)
 const bpName = ref('')
@@ -554,7 +604,10 @@ async function swapStation(row) {
 async function bpEdit(op, quarter) {
   bpLoading.value = true
   try {
-    const payload = { Json: bpModel.value, Op: op, Quarter: quarter ?? 0, Dx: bpDx.value, Dy: bpDy.value }
+    const payload = { Json: bpModel.value, Op: op, Quarter: quarter ?? 0, Dx: bpDx.value, Dy: bpDy.value,
+      ZoomX: bpZoomX.value, ZoomY: bpZoomY.value, RotateDeg: bpRotate.value,
+      Floors: bpFloors.value, Spacing: bpSpacing.value, Pile: bpPile.value,
+      Dz: bpDz.value, Align: bpAlign.value }
     if (op === 'stack') payload.RawText = bpSecond.value.trim()
     if (bpName.value.trim()) { payload.NewName = bpName.value.trim(); payload.NewDesc = bp.desc || '' }
     const res = await fetch('/api/blueprint/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -568,6 +621,22 @@ async function bpEdit(op, quarter) {
   } catch (e) { ElMessage.error('编辑失败: ' + e.message) }
   finally { bpLoading.value = false }
 }
+async function makeVbelt() {
+  bpLoading.value = true
+  try {
+    const payload = { Json: bpModel.value || '{}', Op: 'vbelt', StartZ: bpVz1.value, EndZ: bpVz2.value }
+    const res = await fetch('/api/blueprint/edit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    if (!res.ok) throw new Error(await res.text())
+    const d = await res.json()
+    bpModel.value = d.json
+    bp.value = d.summary
+    bpExported.value = d.blueprint
+    bpExportInfo.value = '垂直传送带已生成'
+    ElMessage.success('已生成垂直传送带蓝图')
+  } catch (e) { ElMessage.error(e.message) }
+  finally { bpLoading.value = false }
+}
+
 async function bpNoBelt() {
   bpLoading.value = true
   try {
