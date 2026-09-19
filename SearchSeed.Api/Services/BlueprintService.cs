@@ -30,6 +30,9 @@ public class BlueprintService
         Recipes = JsonSerializer.Deserialize<Dictionary<string, RecipeInfo>>(File.ReadAllText(Path.Combine(dir, "recipes.json"))) ?? new();
     }
 
+    string? _lastDesc;
+    public string? DescOf(byte[] data) => _lastDesc;
+
     public string ItemName(int id) => Items.GetValueOrDefault(id.ToString(), "物品#" + id);
 
     // 定位并解出 gzip 内层原始字节；文本模式同时提取蓝图名
@@ -43,10 +46,11 @@ public class BlueprintService
             // BLUEPRINT:<layout>,"<version>","<name>","<base64>","<md5>"
             var m = Regex.Match(text, "\"([A-Za-z0-9+/=]{100,})\"");
             if (!m.Success) throw new ArgumentException("蓝图文本格式无法识别（未找到 base64 数据段）");
-            data = Convert.FromBase64String(m.Groups[1].Value);
-            // BLUEPRINT:0,"9","名字","base64","md5" → 第三段是名字
-            var parts = text.Split(',');
-            if (parts.Length >= 3) name = parts[2].Trim().Trim('"');
+            var b64 = m.Groups[1].Value;
+            if (b64.Length % 4 != 0)
+                throw new ArgumentException($"base64 长度异常（蓝图文本很可能复制时丢了字符，请回到游戏重新全选复制）");
+            data = Convert.FromBase64String(b64);
+            (name, _lastDesc) = TryParseHeader(text);
         }
         else if (data.All(b => b is (>= 32 and <= 126) or 10 or 13 or 9))
         {
@@ -63,6 +67,28 @@ public class BlueprintService
         using var outMs = new MemoryStream();
         gz.CopyTo(outMs);
         return (outMs.ToArray(), name);
+    }
+
+    // 新版头：BLUEPRINT:0,30,icon..,bigint,游戏版本,URL名,URL描述+"base64"...
+    // 旧版头：BLUEPRINT:0,"9","名字","base64","md5"
+    (string name, string? desc) TryParseHeader(string text)
+    {
+        var parts = text.Split(',');
+        if (parts.Length >= 12)
+        {
+            // 新版：第 11 段(索引10)=URL编码名；第 12 段(索引11)=URL编码描述+引号base64
+            var name = Uri.UnescapeDataString(parts[10]);
+            var desc = parts[11].Contains('"') ? Uri.UnescapeDataString(parts[11].Split('"')[0]) : "";
+            if (name.Length > 0 && !name.StartsWith('%') && !name.All(char.IsDigit))
+                return (name, string.IsNullOrEmpty(desc) ? null : desc);
+        }
+        // 旧版：第 3 段(索引2)=引号名
+        if (parts.Length >= 3)
+        {
+            var n = parts[2].Trim().Trim('"');
+            if (n.Length > 0 && !n.All(char.IsDigit)) return (Uri.UnescapeDataString(n), null);
+        }
+        return ("", null);
     }
 
     class BpBuilding
@@ -155,6 +181,7 @@ public class BlueprintService
     public object Parse(byte[] data)
     {
         var (inner, name) = Unwrap(data);
+        string? desc = DescOf(data);
         var buildings = ReadBuildings(inner);
         if (buildings.Count == 0) throw new InvalidDataException("蓝图内没有建筑");
 
@@ -196,7 +223,7 @@ public class BlueprintService
 
         return new
         {
-            name,
+            name, desc,
             buildingCount = buildings.Count,
             beltCount = buildingGroups.GetValueOrDefault("低速传送带") + buildingGroups.GetValueOrDefault("高速传送带") + buildingGroups.GetValueOrDefault("极速传送带"),
             area = new { width = Math.Round(maxX - minX, 1), height = Math.Round(maxY - minY, 1) },
