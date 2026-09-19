@@ -343,22 +343,32 @@
 
       <div v-if="galaxy" class="sort-bar">
         <span class="lbl">排序：</span>
-        <el-select v-model="sortKey" size="small" style="width:120px">
-          <el-option label="默认（编号）" value="" />
-          <el-option label="距离（近→远）" value="distance" />
-          <el-option label="光度 L" value="dysonLumino" />
-          <el-option label="太阳能 L" value="luminosity" />
-          <el-option label="安全度" value="safetyFactor" />
-          <el-option label="行星数" value="planetCount" />
-          <el-option label="总矿脉数" value="__veinTotal" />
-          <el-option v-for="v in veins" :key="v" :label="v + ' 数量'" :value="'vp:' + v" />
-          <el-option v-for="v in veins" :key="'a' + v" :label="v + ' 储量'" :value="'va:' + v" />
-        </el-select>
-        <el-radio-group v-model="sortDir" size="small" style="margin-left:8px">
-          <el-radio-button value="desc">降序</el-radio-button>
-          <el-radio-button value="asc">升序</el-radio-button>
-        </el-radio-group>
-        <el-input v-model="starFilter" size="small" placeholder="按名称/类型筛选恒星" style="width:180px;margin-left:8px" clearable />
+        <div v-for="(r, i) in sortRules" :key="i" class="sort-rule">
+          <span v-if="i > 0" class="lbl">→</span>
+          <el-select v-model="r.key" size="small" style="width:150px">
+            <el-option label="（不排序）" value="" />
+            <el-option label="距离" value="distance" />
+            <el-option label="光度 L" value="dysonLumino" />
+            <el-option label="太阳能 L" value="luminosity" />
+            <el-option label="安全度" value="safetyFactor" />
+            <el-option label="行星数" value="planetCount" />
+            <el-option label="总矿脉数" value="__veinTotal" />
+            <el-option v-for="v in veins" :key="v" :label="'星系 ' + v + ' 数量'" :value="'vp:' + v" />
+            <el-option v-for="v in veins" :key="'a' + v" :label="'星系 ' + v + ' 储量'" :value="'va:' + v" />
+            <el-option label="行星·最大适建区域" value="p:maxLand" />
+            <el-option label="行星·最大轨道半径" value="p:maxOrbit" />
+            <el-option label="行星·最高光度" value="p:maxLum" />
+            <el-option label="行星·最大风能" value="p:maxWind" />
+            <el-option v-for="v in veins" :key="'pv' + v" :label="'行星·最富 ' + v + '（数量）'" :value="'pvp:' + v" />
+            <el-option v-for="v in veins" :key="'pa' + v" :label="'行星·最富 ' + v + '（储量）'" :value="'pva:' + v" />
+          </el-select>
+          <el-button size="small" :type="r.dir === 'asc' ? 'success' : 'primary'" plain @click="r.dir = r.dir === 'asc' ? 'desc' : 'asc'">
+            {{ r.dir === 'asc' ? '↑ 升' : '↓ 降' }}
+          </el-button>
+          <el-button v-if="sortRules.length > 1" size="small" text type="danger" @click="sortRules.splice(i, 1)">✕</el-button>
+        </div>
+        <el-button v-if="sortRules.length < 5" size="small" plain @click="sortRules.push({ key: '', dir: 'desc' })">+ 新增条件</el-button>
+        <el-input v-model="starFilter" size="small" placeholder="按名称/类型筛选恒星" style="width:170px;margin-left:8px" clearable />
       </div>
       <el-table v-if="galaxy" :data="sortedStars" height="calc(100vh - 360px)" @row-click="selectStar" highlight-current-row>
         <el-table-column prop="index" label="#" width="50" />
@@ -548,21 +558,37 @@ const bpSecond = ref('')
 const bpExported = ref('')
 const bpExportInfo = ref('')
 
-const sortKey = ref('')
-const sortDir = ref('desc')
+const sortRules = ref([{ key: '', dir: 'desc' }])
 const starFilter = ref('')
+
+function sortVal(star, key) {
+  const planets = star.planets || []
+  if (key === '__veinTotal') return Object.values(star.veinsPoint || {}).reduce((a, v) => a + v, 0)
+  if (key.startsWith('vp:')) return star.veinsPoint?.[key.slice(3)] || 0
+  if (key.startsWith('va:')) return Number(star.veinsAmount?.[key.slice(3)] || 0)
+  if (key === 'p:maxLand') return planets.reduce((m, p) => Math.max(m, p.landPercent ?? -1), -1)
+  if (key === 'p:maxOrbit') return planets.reduce((m, p) => Math.max(m, p.orbitRadius || 0), 0)
+  if (key === 'p:maxLum') return planets.reduce((m, p) => Math.max(m, p.luminosity || 0), 0)
+  if (key === 'p:maxWind') return planets.reduce((m, p) => Math.max(m, p.wind || 0), 0)
+  if (key.startsWith('pvp:')) { const n = key.slice(4); return planets.reduce((m, p) => Math.max(m, p.veinsPoint?.[n] || 0), 0) }
+  if (key.startsWith('pva:')) { const n = key.slice(4); return planets.reduce((m, p) => Math.max(m, Number(p.veinsAmount?.[n] || 0)), 0) }
+  return star[key] ?? 0
+}
+
 const sortedStars = computed(() => {
   if (!galaxy.value) return []
   let arr = [...galaxy.value.stars]
   const f = starFilter.value.trim().toLowerCase()
   if (f) arr = arr.filter(x => x.name.toLowerCase().includes(f) || x.type.includes(f))
-  if (!sortKey.value) return arr
-  const dir = sortDir.value === 'asc' ? 1 : -1
-  const key = sortKey.value
-  if (key === '__veinTotal') arr.sort((a, b) => dir * (Object.values(b.veinsPoint || {}).reduce((s2, v) => s2 + v, 0) - Object.values(a.veinsPoint || {}).reduce((s2, v) => s2 + v, 0)))
-  else if (key.startsWith('vp:')) { const n = key.slice(3); arr.sort((a, b) => dir * ((b.veinsPoint?.[n] || 0) - (a.veinsPoint?.[n] || 0))) }
-  else if (key.startsWith('va:')) { const n = key.slice(3); arr.sort((a, b) => dir * ((b.veinsAmount?.[n] || 0) - (a.veinsAmount?.[n] || 0))) }
-  else arr.sort((a, b) => dir * ((b[key] ?? 0) - (a[key] ?? 0)))
+  const rules = sortRules.value.filter(r => r.key)
+  if (!rules.length) return arr
+  arr.sort((a, b) => {
+    for (const r of rules) {
+      const d = sortVal(b, r.key) - sortVal(a, r.key)
+      if (d !== 0) return r.dir === 'asc' ? -d : d
+    }
+    return 0
+  })
   return arr
 })
 
@@ -788,7 +814,8 @@ body { margin: 0; background: #f5f7fa; color: #303133; }
 .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
   position: sticky; top: 0; z-index: 20; background: #f5f7fa; padding: 8px 0; }
 .header h1 { font-size: 20px; margin: 0; }
-.sort-bar { display: flex; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+.sort-bar { display: flex; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 4px; }
+.sort-rule { display: flex; align-items: center; gap: 2px; }
 .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .summary { margin-bottom: 12px; }
 .card-head { display: flex; justify-content: space-between; align-items: center; }
