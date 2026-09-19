@@ -26,4 +26,4 @@ ref_img/
 .idea/
 .vscode/
 ref_game/
-tools/*.blueprint tools/test*.txt
+tools/*.blueprint tools/test*.txt*.whl
