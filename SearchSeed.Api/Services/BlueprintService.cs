@@ -145,7 +145,23 @@ public class BlueprintService
                 int pc = r.ReadInt16();
                 r.ReadBytes(pc * 4);
             }
-            else throw new InvalidDataException("未知的建筑记录版本: " + tag);
+            else
+            {
+                // 最旧格式：tag 本身就是 index（无 tilt/pitch、无 content）
+                r.ReadSByte();                          // areaIndex
+                b.X = r.ReadSingle(); b.Y = r.ReadSingle();
+                r.ReadSingle();                          // localOffset_z
+                r.ReadBytes(3 * 4);                      // localOffset2 x/y/z
+                r.ReadSingle(); r.ReadSingle();          // yaw, yaw2
+                b.ItemId = r.ReadInt16();
+                r.ReadInt16();                           // modelIndex
+                r.ReadInt32(); r.ReadInt32();
+                r.ReadBytes(6);
+                b.RecipeId = r.ReadInt16();
+                r.ReadInt16();
+                int pc = r.ReadInt16();
+                r.ReadBytes(pc * 4);
+            }
             list.Add(b);
         }
         return list;

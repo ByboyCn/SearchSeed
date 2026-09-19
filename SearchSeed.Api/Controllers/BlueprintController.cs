@@ -36,7 +36,7 @@ public class BlueprintController : ControllerBase
             return Ok(_bp.Parse(data));
         }
         catch (ArgumentException ex) { return BadRequest(ex.Message); }
-        catch (InvalidDataException) { return BadRequest("gzip 解压失败：不是有效的蓝图文件/文本"); }
+        catch (InvalidDataException ex) { return BadRequest("蓝图数据无效: " + ex.Message); }
         catch (JsonException) { return BadRequest("JSON 解析失败：蓝图数据损坏或版本不支持"); }
         catch (FormatException) { return BadRequest("base64 解析失败"); }
         catch (Exception ex) { return StatusCode(500, "解析失败: " + ex.Message); }
