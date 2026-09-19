@@ -169,6 +169,20 @@
               <span class="stat">{{ bp.buildingCount }} 建筑 · {{ bp.beltCount }} 传送带<template v-if="bp.area"> · {{ bp.area.width }}×{{ bp.area.height }}</template></span>
             </template>
             <el-tabs>
+              <el-tab-pane label="3D 预览">
+                <Blueprint3D :buildings="bp3dBuildings" height="460px" @select="b3dSelect = $event" />
+                <div v-if="b3dSelect" class="b3d-info">
+                  <b>{{ b3dSelect.name }}</b> #{{ b3dSelect.index }}
+                  坐标 X={{ b3dSelect.x.toFixed(1) }} Y={{ b3dSelect.y.toFixed(1) }}
+                  <template v-if="b3dSelect.recipeId"> · 配方 #{{ b3dSelect.recipeId }}</template>
+                </div>
+                <div class="b3d-legend">
+                  <span style="color:#4a9eff">■ 传送带</span> <span style="color:#9d7bff">■ 分拣器</span>
+                  <span style="color:#ff8c42">■ 熔炉</span> <span style="color:#67c23a">■ 制造台</span>
+                  <span style="color:#f56c6c">■ 物流塔</span> <span style="color:#f7ba2a">■ 电力</span>
+                  <span class="dim">（拖动旋转 · 滚轮缩放 · 单击选中 · 双击聚焦）</span>
+                </div>
+              </el-tab-pane>
               <el-tab-pane label="建筑清单">
                 <el-table :data="bpBuildings" height="480" size="small">
                   <el-table-column type="index" width="50" />
@@ -386,6 +400,7 @@
 import { ref, reactive, computed, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import ConditionCard from './components/ConditionCard.vue'
+import Blueprint3D from './components/Blueprint3D.vue'
 
 const tab = ref('search')
 const seedId = ref(1234)
@@ -463,6 +478,12 @@ const bpName = ref('')
 const bpSecond = ref('')
 const bpExported = ref('')
 const bpExportInfo = ref('')
+
+const b3dSelect = ref(null)
+const bp3dBuildings = computed(() => {
+  if (!bpModel.value) return []
+  try { return JSON.parse(bpModel.value).buildings.map(b => ({ ...b, x: b.x ?? 0, y: b.y ?? 0 })) } catch { return [] }
+})
 
 const stationDlg = ref(false)
 const stationRow = ref(null)
@@ -682,6 +703,8 @@ body { margin: 0; background: #f5f7fa; color: #303133; }
 .bp-tools { margin-top: 12px; }
 .st-row { display: flex; gap: 4px; align-items: center; margin-bottom: 4px; flex-wrap: wrap; }
 .st-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 12px; }
+.b3d-info { margin-top: 6px; font-size: 13px; }
+.b3d-legend { margin-top: 4px; font-size: 12px; display: flex; gap: 10px; flex-wrap: wrap; }
 .recipe { border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; }
 .r-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .r-flow { display: flex; align-items: center; gap: 12px; }
