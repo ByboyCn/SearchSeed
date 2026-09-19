@@ -25,3 +25,5 @@ ref_img/
 .vs/
 .idea/
 .vscode/
+ref_game/
+tools/*.blueprint tools/test*.txt

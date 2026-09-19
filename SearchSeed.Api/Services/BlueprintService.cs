@@ -1,10 +1,13 @@
 using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 
 namespace SearchSeed.Api.Services;
 
 // 蓝图解析：.blueprint 文件或游戏内复制的 BLUEPRINT:0 文本 → 结构化统计与流水线
+// 二进制格式按官方 Assembly-CSharp 的 BlueprintData/BlueprintBuilding.Import 移植
 public class BlueprintService
 {
     public Dictionary<string, string> Items { get; }
@@ -29,114 +32,174 @@ public class BlueprintService
 
     public string ItemName(int id) => Items.GetValueOrDefault(id.ToString(), "物品#" + id);
 
-    // 输入支持：.blueprint 文件原始字节 / 粘贴的 BLUEPRINT:0,... 文本 / 纯 base64
-    public JsonDocument Decompress(byte[] data)
+    // 定位并解出 gzip 内层原始字节；文本模式同时提取蓝图名
+    (byte[] inner, string name) Unwrap(byte[] data)
     {
-        // 尝试当文本（BLUEPRINT:0,"9","名字","base64"）
-        var head = Encoding.UTF8.GetString(data.Take(Math.Min(data.Length, 64)).ToArray());
+        string name = "";
+        var head = Encoding.UTF8.GetString(data.Take(Math.Min(64, data.Length)).ToArray());
         if (head.StartsWith("BLUEPRINT:"))
         {
             var text = Encoding.UTF8.GetString(data).Trim();
-            // 取最后一个引号包住的长 base64 段
-            var m = System.Text.RegularExpressions.Regex.Match(text, "\"([A-Za-z0-9+/=]{100,})\"");
-            if (!m.Success) throw new ArgumentException("蓝图文本格式无法识别");
+            // BLUEPRINT:<layout>,"<version>","<name>","<base64>","<md5>"
+            var m = Regex.Match(text, "\"([A-Za-z0-9+/=]{100,})\"");
+            if (!m.Success) throw new ArgumentException("蓝图文本格式无法识别（未找到 base64 数据段）");
             data = Convert.FromBase64String(m.Groups[1].Value);
+            // BLUEPRINT:0,"9","名字","base64","md5" → 第三段是名字
+            var parts = text.Split(',');
+            if (parts.Length >= 3) name = parts[2].Trim().Trim('"');
         }
         else if (data.All(b => b is (>= 32 and <= 126) or 10 or 13 or 9))
         {
-            // 可能是纯 base64 文本
             try
             {
-                var txt = Encoding.UTF8.GetString(data).Trim().Replace("\n", "").Replace("\r", "");
+                var txt = Encoding.UTF8.GetString(data).Trim().Replace("\r", "").Replace("\n", "");
                 if (txt.Length > 100 && txt.All(c => char.IsLetterOrDigit(c) || c is '+' or '/' or '='))
                     data = Convert.FromBase64String(txt);
             }
             catch { }
         }
-        // gzip 解压
         using var ms = new MemoryStream(data);
         using var gz = new GZipStream(ms, CompressionMode.Decompress);
         using var outMs = new MemoryStream();
         gz.CopyTo(outMs);
-        return JsonDocument.Parse(outMs.ToArray());
+        return (outMs.ToArray(), name);
+    }
+
+    class BpBuilding
+    {
+        public int ItemId, RecipeId;
+        public double X, Y;
+    }
+
+    // 官方二进制格式解析（BlueprintData.Import / BlueprintBuilding.Import）
+    List<BpBuilding> ParseBinary(byte[] bin)
+    {
+        using var r = new BinaryReader(new MemoryStream(bin));
+        int version = r.ReadInt32();
+        for (int i = 0; i < 6; i++) r.ReadInt32(); // cursorOffset_x/y/targetArea/dragBox_x/y/primaryAreaIdx
+        int areaCount = r.ReadByte();
+        if (areaCount > 64) throw new InvalidDataException("蓝图区域数非法");
+        r.ReadBytes(areaCount * 14); // BlueprintArea 每条 14 字节
+        int buildingCount = r.ReadInt32();
+        if (buildingCount < 0 || buildingCount > 1048576) throw new InvalidDataException("建筑数非法");
+        var list = new List<BpBuilding>(buildingCount);
+        for (int j = 0; j < buildingCount; j++)
+        {
+            int tag = r.ReadInt32();
+            var b = new BpBuilding();
+            if (tag <= -101)
+            {
+                r.ReadInt32();              // index
+                b.ItemId = r.ReadInt16();
+                r.ReadInt16();              // modelIndex
+                r.ReadSByte();              // areaIndex
+                b.X = r.ReadSingle(); b.Y = r.ReadSingle();
+                r.ReadSingle(); r.ReadSingle(); // z, yaw
+                if (b.ItemId > 2000 && b.ItemId < 2010) r.ReadSingle();               // 分拣器 tilt
+                else if (b.ItemId > 2010 && b.ItemId < 2020) r.ReadBytes(8 * 4);      // 弯传送带 8 float
+                r.ReadInt32(); r.ReadInt32();  // tempOutput/Input
+                r.ReadBytes(6);                 // 6 × sbyte 插槽
+                b.RecipeId = r.ReadInt16();
+                r.ReadInt16();                  // filterId
+                int pc = r.ReadInt16();
+                r.ReadBytes(pc * 4);
+                if (tag <= -102 && r.ReadInt32() > 0) _ = r.ReadString(); // content
+            }
+            else if (tag <= -100)
+            {
+                r.ReadInt32();              // index
+                r.ReadSByte();              // areaIndex
+                r.ReadSingle();             // yaw
+                b.ItemId = r.ReadInt16();
+                r.ReadInt16();
+                r.ReadInt32(); r.ReadInt32();
+                r.ReadBytes(6);
+                b.RecipeId = r.ReadInt16();
+                r.ReadInt16();
+                int pc = r.ReadInt16();
+                r.ReadBytes(pc * 4);
+            }
+            else throw new InvalidDataException("未知的建筑记录版本: " + tag);
+            list.Add(b);
+        }
+        return list;
+    }
+
+    List<(int itemId, int recipeId, double x, double y)> ReadBuildings(byte[] inner)
+    {
+        if (inner.Length > 0 && inner[0] == (byte)'{')
+        {
+            var node = JsonNode.Parse(inner);
+            if (node is JsonObject root)
+            {
+                if (root.ContainsKey("blueprints") && root["blueprints"] is JsonArray arr && arr.Count > 0)
+                    root = (arr[0] as JsonObject)!;
+                else if (root.ContainsKey("blueprint") && root["blueprint"] is JsonObject bn)
+                    root = bn;
+                var result = new List<(int, int, double, double)>();
+                if (root.ContainsKey("buildings") && root["buildings"] is JsonArray bs)
+                    foreach (var b in bs.OfType<JsonObject>())
+                    {
+                        int itemId = b.ContainsKey("itemId") ? (int)b["itemId"]! : 0;
+                        int recipeId = b.ContainsKey("recipeId") && b["recipeId"] != null ? (int)b["recipeId"]! : 0;
+                        double x = b.ContainsKey("localOffset_x") ? (double)b["localOffset_x"]! : 0;
+                        double y = b.ContainsKey("localOffset_y") ? (double)b["localOffset_y"]! : 0;
+                        result.Add((itemId, recipeId, x, y));
+                    }
+                return result;
+            }
+        }
+        return ParseBinary(inner).Select(b => (b.ItemId, b.RecipeId, b.X, b.Y)).ToList();
     }
 
     public object Parse(byte[] data)
     {
-        using var doc = Decompress(data);
-        var root = doc.RootElement;
+        var (inner, name) = Unwrap(data);
+        var buildings = ReadBuildings(inner);
+        if (buildings.Count == 0) throw new InvalidDataException("蓝图内没有建筑");
 
-        // 兼容单蓝图/蓝图文件夹
-        var bp = root;
-        if (root.TryGetProperty("blueprints", out var bps) && bps.ValueKind == JsonValueKind.Array && bps.GetArrayLength() > 0)
-            bp = bps[0];
-        else if (root.TryGetProperty("blueprint", out var bpn) && bpn.ValueKind == JsonValueKind.Object)
-            bp = bpn;
-
-        string name = "";
-        if (bp.TryGetProperty("header", out var header) && header.TryGetProperty("name", out var hn) && hn.ValueKind == JsonValueKind.String)
-            name = hn.GetString() ?? "";
-        if (string.IsNullOrEmpty(name) && bp.TryGetProperty("name", out var n2) && n2.ValueKind == JsonValueKind.String)
-            name = n2.GetString() ?? "";
-
-        var buildings = bp.TryGetProperty("buildings", out var b) && b.ValueKind == JsonValueKind.Array ? b : default;
-        var belts = bp.TryGetProperty("belt_data", out var bd) && bd.ValueKind == JsonValueKind.Array ? bd : default;
-
-        var buildingGroups = new Dictionary<string, int>();       // 建筑名 → 数量
-        var recipeGroups = new Dictionary<string, RecipeAgg>();   // 配方名 → 聚合
-        int buildingCount = 0, beltCount = belts.ValueKind == JsonValueKind.Array ? belts.GetArrayLength() : 0;
+        var buildingGroups = new Dictionary<string, int>();
+        var recipeGroups = new Dictionary<string, RecipeAgg>();
         double minX = double.MaxValue, maxX = double.MinValue, minY = double.MaxValue, maxY = double.MinValue;
 
-        if (buildings.ValueKind == JsonValueKind.Array)
+        foreach (var (itemId, recipeId, x, y) in buildings)
         {
-            foreach (var bld in buildings.EnumerateArray())
+            string bname = itemId > 0 ? ItemName(itemId) : "未知建筑";
+            buildingGroups[bname] = buildingGroups.GetValueOrDefault(bname) + 1;
+            minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
+            minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
+
+            if (recipeId > 0 && Recipes.TryGetValue(recipeId.ToString(), out var rec))
             {
-                buildingCount++;
-                int itemId = bld.TryGetProperty("itemId", out var ii) ? ii.GetInt32() : 0;
-                string bname = itemId > 0 ? ItemName(itemId) : "未知建筑";
-                buildingGroups[bname] = buildingGroups.GetValueOrDefault(bname) + 1;
-
-                if (bld.TryGetProperty("localOffset_x", out var lx) && bld.TryGetProperty("localOffset_y", out var ly))
+                if (!recipeGroups.TryGetValue(rec.name, out var agg))
                 {
-                    double x = lx.GetDouble(), y = ly.GetDouble();
-                    minX = Math.Min(minX, x); maxX = Math.Max(maxX, x);
-                    minY = Math.Min(minY, y); maxY = Math.Max(maxY, y);
-                }
-
-                if (bld.TryGetProperty("recipeId", out var ri) && ri.TryGetInt32(out var recipeId) && recipeId > 0
-                    && Recipes.TryGetValue(recipeId.ToString(), out var rec))
-                {
-                    if (!recipeGroups.TryGetValue(rec.name, out var agg))
+                    agg = new RecipeAgg
                     {
-                        agg = new RecipeAgg
-                        {
-                            Name = rec.name,
-                            Building = bname,
-                            Inputs = rec.items.Zip(rec.itemCounts, (id, c) => new ItemQty { Name = ItemName(id), PerCraft = c }).ToList(),
-                            Outputs = rec.results.Zip(rec.resultCounts, (id, c) => new ItemQty { Name = ItemName(id), PerCraft = c }).ToList(),
-                        };
-                        recipeGroups[rec.name] = agg;
-                    }
-                    agg.Buildings++;
+                        Name = rec.name,
+                        Building = bname,
+                        Inputs = rec.items.Zip(rec.itemCounts, (id, c) => new ItemQty { Name = ItemName(id), PerCraft = c }).ToList(),
+                        Outputs = rec.results.Zip(rec.resultCounts, (id, c) => new ItemQty { Name = ItemName(id), PerCraft = c }).ToList(),
+                    };
+                    recipeGroups[rec.name] = agg;
                 }
+                agg.Buildings++;
             }
         }
 
-        // 每秒速率：产物速率 = 建筑数 × resultCount × 60 / timeSpend（帧@60fps）
         foreach (var agg in recipeGroups.Values)
         {
             var rec = Recipes.Values.First(r => r.name == agg.Name);
             double craftPerSec = rec.timeSpend > 0 ? 60.0 / rec.timeSpend : 0;
             agg.OutputRates = agg.Outputs.Select(o => new Rate { Name = o.Name, PerSec = Math.Round(agg.Buildings * o.PerCraft * craftPerSec, 2) }).ToList();
-            agg.InputRates = agg.Inputs.Select(i2 => new Rate { Name = i2.Name, PerSec = Math.Round(agg.Buildings * i2.PerCraft * craftPerSec, 2) }).ToList();
+            agg.InputRates = agg.Inputs.Select(i => new Rate { Name = i.Name, PerSec = Math.Round(agg.Buildings * i.PerCraft * craftPerSec, 2) }).ToList();
         }
 
         return new
         {
             name,
-            buildingCount,
-            beltCount,
-            area = buildingCount > 0 && minX != double.MaxValue ? new { width = Math.Round(maxX - minX, 1), height = Math.Round(maxY - minY, 1) } : null,
+            buildingCount = buildings.Count,
+            beltCount = buildingGroups.GetValueOrDefault("低速传送带") + buildingGroups.GetValueOrDefault("高速传送带") + buildingGroups.GetValueOrDefault("极速传送带"),
+            area = new { width = Math.Round(maxX - minX, 1), height = Math.Round(maxY - minY, 1) },
             buildings = buildingGroups.OrderBy(kv => -kv.Value).Select(kv => new { name = kv.Key, count = kv.Value }).ToList(),
             recipes = recipeGroups.Values.OrderBy(r => -r.Buildings).ToList(),
         };
