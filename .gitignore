@@ -6,7 +6,7 @@ obj/
 
 # Node
 node_modules/
-web/dist/
+frontend/dist/
 
 # 本地数据与工具产物
 data/

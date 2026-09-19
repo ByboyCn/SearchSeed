@@ -63,7 +63,7 @@ SearchSeed.Api/           ASP.NET Core Web API
     ├── PrecomputeService 后台预热计算
     └── SearchService     条件搜索（并行扫描）
 
-web/                      Vue 3 + Element Plus 前端（构建产物由 API 静态托管）
+frontend/                      Vue 3 + Element Plus 前端（构建产物由 API 静态托管）
 deploy/                   nginx 反向代理配置
 ```
 
@@ -78,7 +78,7 @@ deploy/                   nginx 反向代理配置
 dotnet run --project SearchSeed.Api
 
 # 前端（开发模式，已配置 /api 代理）
-cd web && npm install && npm run dev
+cd frontend && npm install && npm run dev
 ```
 
 ### Docker 部署
