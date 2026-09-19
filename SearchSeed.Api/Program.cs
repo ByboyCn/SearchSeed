@@ -18,6 +18,7 @@ builder.Services.AddSingleton<SeedService>(sp =>
 builder.Services.AddSingleton<GalaxyStore>();
 builder.Services.AddHostedService<PrecomputeService>();
 builder.Services.AddSingleton<SearchService>();
+builder.Services.AddSingleton<BlueprintService>();
 var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();

@@ -14,4 +14,7 @@
     <ProjectReference Include="..\SearchSeed.Core\SearchSeed.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="BlueprintData\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

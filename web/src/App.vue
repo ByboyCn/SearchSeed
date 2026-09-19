@@ -4,6 +4,7 @@
       <h1>戴森球计划 · 种子工具</h1>
       <el-radio-group v-model="tab">
         <el-radio-button value="search">种子搜索</el-radio-button>
+        <el-radio-button value="blueprint">蓝图解析</el-radio-button>
         <el-radio-button value="viewer">种子查看</el-radio-button>
       </el-radio-group>
     </header>
@@ -102,6 +103,62 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- ===== 蓝图解析 ===== -->
+    <div v-show="tab === 'blueprint'">
+      <el-row :gutter="12">
+        <el-col :span="8">
+          <el-card shadow="never">
+            <template #header>上传蓝图</template>
+            <el-upload drag :auto-upload="false" :limit="1" :on-change="f => (bpFile = f.raw)" accept=".blueprint,.blueprint-zip,.txt">
+              <div class="el-upload__text">拖入 .blueprint 文件<br />或 <em>点击选择</em></div>
+            </el-upload>
+            <el-divider>或粘贴游戏内复制的蓝图文本</el-divider>
+            <el-input v-model="bpText" type="textarea" :rows="6" placeholder="BLUEPRINT:0,&quot;9&quot;,&quot;蓝图名&quot;,&quot;AAAA...&quot;" />
+            <div style="margin-top:10px">
+              <el-button type="primary" :loading="bpLoading" @click="parseBlueprint">解析蓝图</el-button>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="16">
+          <el-card shadow="never" v-if="bp">
+            <template #header>
+              {{ bp.name || '未命名蓝图' }}
+              <span class="stat">{{ bp.buildingCount }} 建筑 · {{ bp.beltCount }} 传送带<template v-if="bp.area"> · {{ bp.area.width }}×{{ bp.area.height }}</template></span>
+            </template>
+            <el-tabs>
+              <el-tab-pane label="建筑清单">
+                <el-table :data="bp.buildings" height="480" size="small">
+                  <el-table-column type="index" width="50" />
+                  <el-table-column prop="name" label="建筑" />
+                  <el-table-column prop="count" label="数量" width="90" sortable />
+                </el-table>
+              </el-tab-pane>
+              <el-tab-pane :label="'流水线 (' + bp.recipes.length + ')'">
+                <div v-for="r in bp.recipes" :key="r.name" class="recipe">
+                  <div class="r-head">
+                    <b>{{ r.name }}</b>
+                    <el-tag size="small" type="info">{{ r.building }} × {{ r.buildings }}</el-tag>
+                  </div>
+                  <div class="r-flow">
+                    <div class="r-io">
+                      <div v-for="(i, idx) in r.inputRates" :key="'i'+idx" class="io-line in">{{ i.name }} <b>{{ i.perSec }}</b>/s</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="r-mid">{{ r.building }}<br /><span class="dim">×{{ r.buildings }}</span></div>
+                    <div class="arrow">→</div>
+                    <div class="r-io">
+                      <div v-for="(o, idx) in r.outputRates" :key="'o'+idx" class="io-line out">{{ o.name }} <b>{{ o.perSec }}</b>/s</div>
+                    </div>
+                  </div>
+                </div>
+                <el-empty v-if="!bp.recipes.length" description="蓝图内没有生产配方建筑" />
+              </el-tab-pane>
+            </el-tabs>
+          </el-card>
+        </el-col>
+      </el-row>
+    </div>
 
     <!-- ===== 查看器 ===== -->
     <div v-show="tab === 'viewer'">
@@ -305,6 +362,28 @@ function formatNum(n) {
 }
 
 // ===== 搜索 =====
+const bpFile = ref(null)
+const bpText = ref('')
+const bpLoading = ref(false)
+const bp = ref(null)
+async function parseBlueprint() {
+  bpLoading.value = true
+  bp.value = null
+  try {
+    let res
+    if (bpFile.value) {
+      const fd = new FormData()
+      fd.append('file', bpFile.value)
+      res = await fetch('/api/blueprint', { method: 'POST', body: fd })
+    } else if (bpText.value.trim()) {
+      res = await fetch('/api/blueprint', { method: 'POST', body: bpText.value.trim() })
+    } else { ElMessage.warning('请选择文件或粘贴蓝图文本'); bpLoading.value = false; return }
+    if (!res.ok) throw new Error(await res.text())
+    bp.value = await res.json()
+  } catch (e) { ElMessage.error('解析失败: ' + e.message) }
+  finally { bpLoading.value = false }
+}
+
 const fromSeed = ref(0)
 const starNumFrom = ref(32)
 const starNumTo = ref(64)
@@ -395,5 +474,14 @@ body { margin: 0; background: #f5f7fa; color: #303133; }
 .pv { font-size: 12px; }
 .gas { font-size: 12px; color: #67c23a; }
 .star-desc { margin-bottom: 10px; }
+.recipe { border: 1px solid #ebeef5; border-radius: 6px; padding: 8px 12px; margin-bottom: 8px; }
+.r-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.r-flow { display: flex; align-items: center; gap: 12px; }
+.r-io { min-width: 160px; }
+.io-line { font-size: 12px; }
+.io-line.in { color: #e6a23c; }
+.io-line.out { color: #67c23a; }
+.arrow { color: #c0c4cc; font-size: 18px; }
+.r-mid { text-align: center; font-size: 12px; background: #f0f7ff; border-radius: 4px; padding: 6px 10px; }
 .tag { margin: 1px; }
 </style>
