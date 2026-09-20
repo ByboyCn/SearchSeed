@@ -54,7 +54,7 @@ public class SearchService
                         try
                         {
                             bool cached = _store.IsDone((int)seed, sn, job.ResourceIndex, job.FastMode);
-                            var g = _seeds.GetGalaxy((int)seed, sn, job.ResourceIndex, job.FastMode);
+                            var g = _seeds.GetGalaxy((int)seed, sn, job.ResourceIndex, job.FastMode, innerParallelism: 1); // 外层已全核，内层单线程
                             Interlocked.Increment(ref job.Scanned);
                             if (cached) Interlocked.Increment(ref job.Skipped);
                             if (CondEval.Check(g, job.Conditions, out var hits))

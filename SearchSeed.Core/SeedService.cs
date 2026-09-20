@@ -14,7 +14,8 @@ public class SeedService
 
     static readonly Dictionary<(int, int, int, bool), GalaxyResult> Cache = new();
 
-    public GalaxyResult GetGalaxy(int seedId, int starNum = 64, int resourceIndex = 4, bool fastMode = false)
+    // 内部（行星地形）并行度：查看单种子=全核；批量（预热/搜索）由外层并行时应传 1，避免过度订阅
+    public GalaxyResult GetGalaxy(int seedId, int starNum = 64, int resourceIndex = 4, bool fastMode = false, int? innerParallelism = null)
     {
         LastUsedResourceIndex = resourceIndex;
         var key = (seedId, starNum, resourceIndex, fastMode);
@@ -50,7 +51,8 @@ public class SeedService
                 foreach (var planet in star.Planets)
                     if (planet.GasItems.Count == 0)
                         tasks.Add((star, planet));
-            Parallel.ForEach(tasks, t =>
+            var po = new ParallelOptions { MaxDegreeOfParallelism = innerParallelism ?? Environment.ProcessorCount };
+            Parallel.ForEach(tasks, po, t =>
             {
                 var (star, planet) = t;
                 var algo = PlanetAlgorithmFactory.Create(planet.AlgoId);

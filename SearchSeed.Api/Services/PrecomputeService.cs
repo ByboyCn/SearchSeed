@@ -39,7 +39,7 @@ public class PrecomputeService : BackgroundService
                 {
                     if (_seeds.LastUsedResourceIndex != resIdx) break; // 用户切换资源 → 转向新组合
                     if (_store.IsDone((int)cursor, starNum, resIdx, false)) { cursor++; continue; }
-                    var result = _seeds.GetGalaxy((int)cursor, starNum, resIdx, fastMode: false);
+                    var result = _seeds.GetGalaxy((int)cursor, starNum, resIdx, fastMode: false, innerParallelism: 1); // 单线程预热
                     _store.Save((int)cursor, starNum, resIdx, false, result);
                     cursor++; saved++;
                     if (saved % 32 == 0)
