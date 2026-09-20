@@ -365,12 +365,13 @@
             <el-option v-for="v in veins" :key="'pv' + v" :label="'行星·最富 ' + v + '（数量）'" :value="'pvp:' + v" />
             <el-option v-for="v in veins" :key="'pa' + v" :label="'行星·最富 ' + v + '（储量）'" :value="'pva:' + v" />
           </el-select>
-          <el-button size="small" :type="r.dir === 'asc' ? 'success' : 'primary'" plain @click="r.dir = r.dir === 'asc' ? 'desc' : 'asc'">
+          <el-checkbox v-model="r.filter" size="small">仅保留满足的</el-checkbox>
+          <el-button v-if="!r.filter" size="small" :type="r.dir === 'asc' ? 'success' : 'primary'" plain @click="r.dir = r.dir === 'asc' ? 'desc' : 'asc'">
             {{ r.dir === 'asc' ? '↑ 升' : '↓ 降' }}
           </el-button>
           <el-button v-if="sortRules.length > 1" size="small" text type="danger" @click="sortRules.splice(i, 1)">✕</el-button>
         </div>
-        <el-button v-if="sortRules.length < 5" size="small" plain @click="sortRules.push({ key: '', dir: 'desc' })">+ 新增条件</el-button>
+        <el-button v-if="sortRules.length < 5" size="small" plain @click="sortRules.push({ key: '', dir: 'desc', filter: false })">+ 新增条件</el-button>
         <el-input v-model="starFilter" size="small" placeholder="按名称/类型筛选恒星" style="width:170px;margin-left:8px" clearable />
       </div>
       <el-table v-if="galaxy" :data="sortedStars" height="calc(100vh - 360px)" @row-click="selectStar" highlight-current-row>
@@ -561,7 +562,7 @@ const bpSecond = ref('')
 const bpExported = ref('')
 const bpExportInfo = ref('')
 
-const sortRules = ref([{ key: '', dir: 'desc' }])
+const sortRules = ref([{ key: '', dir: 'desc', filter: false }])
 const starFilter = ref('')
 
 function sortVal(star, key) {
@@ -584,7 +585,10 @@ const sortedStars = computed(() => {
   let arr = [...galaxy.value.stars]
   const f = starFilter.value.trim().toLowerCase()
   if (f) arr = arr.filter(x => x.name.toLowerCase().includes(f) || x.type.includes(f))
-  const rules = sortRules.value.filter(r => r.key)
+  // AND 筛选：勾选"仅保留满足的"的条件，值 > 0 才保留（海洋=有该海、矿脉=有该矿、适建>0 恒真配合排序用）
+  for (const r of sortRules.value)
+    if (r.key && r.filter) arr = arr.filter(x => sortVal(x, r.key) > 0)
+  const rules = sortRules.value.filter(r => r.key && !r.filter)
   if (!rules.length) return arr
   arr.sort((a, b) => {
     for (const r of rules) {
