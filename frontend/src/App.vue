@@ -57,10 +57,12 @@
           <div class="run-row">
             <span class="lbl">起始种子</span>
             <el-input-number v-model="fromSeed" :min="0" :controls="false" size="small" style="width:120px" />
+            <span class="lbl">终止种子</span>
+            <el-input-number v-model="toSeed" :min="-1" :controls="false" size="small" style="width:120px" />
             <span class="lbl">恒星数</span>
-            <el-input-number v-model="starNumFrom" :min="32" :max="64" :controls="false" size="small" style="width:64px" />
-            <span class="lbl">~</span>
-            <el-input-number v-model="starNumTo" :min="32" :max="64" :controls="false" size="small" style="width:64px" />
+            <span class="dim">64（固定）</span>
+            <span class="lbl">资源</span>
+            <span class="dim">无限（固定）</span>
             <span class="lbl">资源</span>
             <el-select v-model="resourceIndex" size="small" style="width:80px">
               <el-option v-for="(r, i) in resourceNames" :key="i" :label="r" :value="i" />
@@ -754,8 +756,7 @@ async function parseBlueprint() {
 }
 
 const fromSeed = ref(0)
-const starNumFrom = ref(32)
-const starNumTo = ref(64)
+const toSeed = ref(-1)
 const searchMode = ref('fast')
 const jobId = ref(null)
 const job = ref(null)
@@ -778,8 +779,8 @@ function cleanTree(node) {
 
 async function startSearch() {
   const body = {
-    fromSeed: fromSeed.value, starNumFrom: starNumFrom.value, starNumTo: starNumTo.value,
-    resourceIndex: resourceIndex.value,
+    fromSeed: fromSeed.value, toSeed: toSeed.value,
+    starNumFrom: 64, starNumTo: 64, resourceIndex: 10,
     fastMode: searchMode.value === 'fast', maxResults: 200,
     conditions: {
       veins: cleanVeins(cond.veins),

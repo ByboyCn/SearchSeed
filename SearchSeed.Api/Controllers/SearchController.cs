@@ -13,6 +13,7 @@ public class SearchController : ControllerBase
     public class SearchRequest
     {
         public long FromSeed { get; set; } = 0;
+        public long ToSeed { get; set; } = -1; // -1 = 无上限
         public int StarNumFrom { get; set; } = 64;
         public int StarNumTo { get; set; } = 64;
         public int ResourceIndex { get; set; } = 4;
@@ -27,7 +28,7 @@ public class SearchController : ControllerBase
         var c = req.Conditions;
         if (c.Veins.Point.Count == 0 && c.Veins.Amount.Count == 0 && c.Stars.Count == 0 && c.Planets.Count == 0)
             return BadRequest("至少添加一个条件（星区矿脉 / 恒星系条件 / 行星条件）");
-        var job = _search.Start(c, req.FromSeed, req.StarNumFrom, req.StarNumTo, req.ResourceIndex, req.FastMode, req.MaxResults);
+        var job = _search.Start(c, req.FromSeed, req.ToSeed, req.StarNumFrom, req.StarNumTo, req.ResourceIndex, req.FastMode, req.MaxResults);
         return Ok(new { jobId = job.Id });
     }
 

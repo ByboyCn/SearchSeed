@@ -19,11 +19,11 @@ public class SearchService
         _log.LogInformation("搜索并行度: {D} (CPU {N} 核)", _maxDegree, Environment.ProcessorCount);
     }
 
-    public SearchJob Start(GalaxyCond cond, long fromSeed, int starNumFrom, int starNumTo, int resIdx, bool fast, int maxResults)
+    public SearchJob Start(GalaxyCond cond, long fromSeed, long toSeed, int starNumFrom, int starNumTo, int resIdx, bool fast, int maxResults)
     {
         var job = new SearchJob
         {
-            Conditions = cond, FromSeed = fromSeed,
+            Conditions = cond, FromSeed = fromSeed, ToSeed = toSeed,
             StarNumFrom = Math.Max(32, starNumFrom), StarNumTo = Math.Min(64, Math.Max(starNumFrom, starNumTo)),
             ResourceIndex = resIdx, FastMode = fast, MaxResults = maxResults,
         };
@@ -38,11 +38,12 @@ public class SearchService
         try
         {
             const int batch = 128;
-            for (long start = job.FromSeed; !job.Stopped && start <= int.MaxValue; start += batch)
+            long hardEnd = job.ToSeed < 0 ? int.MaxValue : job.ToSeed;
+            for (long start = job.FromSeed; !job.Stopped && start <= hardEnd; start += batch)
             {
                 if (job.Matches.Count >= job.MaxResults) break;
                 var range = new List<long>();
-                for (long s = start; s < start + batch && s <= int.MaxValue; s++) range.Add(s);
+                for (long s = start; s < start + batch && s <= hardEnd; s++) range.Add(s);
                 // 全核并行：多少核心跑多少线程（可被 Search:MaxConcurrency 覆盖）
                 Parallel.ForEach(range, new ParallelOptions { MaxDegreeOfParallelism = _maxDegree }, seed =>
                 {

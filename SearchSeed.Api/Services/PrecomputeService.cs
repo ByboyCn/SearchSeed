@@ -2,22 +2,13 @@ using SearchSeed.Core;
 
 namespace SearchSeed.Api.Services;
 
-// 启动即开始的预热计算服务：按优先级顺序无限遍历种子空间，
-// 已算过的（含用户查询过的）自动跳过；结果持久化到 GalaxyStore
+// 预热服务（轻量版）：空闲时单线程、只跑 64 星；资源倍率跟随用户最近使用（默认无限）
 public class PrecomputeService : BackgroundService
 {
     readonly GalaxyStore _store;
     readonly SeedService _seeds;
     readonly ILogger<PrecomputeService> _log;
     readonly bool _enabled;
-    static readonly SemaphoreSlim Gate = new(Math.Max(1, Environment.ProcessorCount / 2));
-
-    // 预热顺序：64星/1x 优先（最常用），其次 32 星，其余组合靠后
-    static readonly (int starNum, int resIdx)[] Priority =
-    [
-        (64, 4), (64, 5), (64, 3), (64, 6), (64, 7), (64, 8), (64, 2), (64, 1), (64, 0), (64, 9), (64, 10),
-        (32, 4),
-    ];
 
     public PrecomputeService(GalaxyStore store, SeedService seeds, IConfiguration cfg, ILogger<PrecomputeService> log)
     {
@@ -32,45 +23,38 @@ public class PrecomputeService : BackgroundService
             _log.LogInformation("预热计算未启用 (Precompute:Enabled=false)");
             return;
         }
-        _log.LogInformation("预热计算启动：顺序 {Order}", string.Join(",", Priority.Select(p => $"{p.starNum}星{p.resIdx}")));
+        _log.LogInformation("预热启动（单线程，64 星，资源跟随用户，默认无限）");
         var progress = _store.LoadProgress();
-        var tasks = Priority.Select(p => Task.Run(() => RunCombo(p.starNum, p.resIdx, progress, ct), ct)).ToArray();
-        await Task.WhenAll(tasks);
-    }
-
-    async Task RunCombo(int starNum, int resIdx, Dictionary<string, ulong> progress, CancellationToken ct)
-    {
-        var key = $"{starNum}_{resIdx}_std";
-        ulong cursor;
-        lock (_store.ProgressLock) progress.TryGetValue(key, out cursor);
-        int done = 0;
         while (!ct.IsCancellationRequested)
         {
-            if (_store.IsDone((int)cursor, starNum, resIdx, false))
-            {
-                cursor++; continue;
-            }
-            await Gate.WaitAsync(ct);
+            int starNum = 64;
+            int resIdx = _seeds.LastUsedResourceIndex;
+            var key = $"{starNum}_{resIdx}_std";
+            ulong cursor;
+            lock (_store.ProgressLock) progress.TryGetValue(key, out cursor);
+            int saved = 0;
             try
             {
-                // 每算 16 个存一次游标
-                var result = _seeds.GetGalaxy((int)cursor, starNum, resIdx, fastMode: false);
-                _store.Save((int)cursor, starNum, resIdx, false, result);
-                cursor++; done++;
-                if (done % 16 == 0)
+                while (!ct.IsCancellationRequested)
                 {
-                    lock (_store.ProgressLock) progress[key] = cursor;
-                    _store.SaveProgress(progress);
-                    _log.LogInformation("预热进度 {Key}: 下一种子 {Cursor} (已完成 {Done})", key, cursor, done);
+                    if (_seeds.LastUsedResourceIndex != resIdx) break; // 用户切换资源 → 转向新组合
+                    if (_store.IsDone((int)cursor, starNum, resIdx, false)) { cursor++; continue; }
+                    var result = _seeds.GetGalaxy((int)cursor, starNum, resIdx, fastMode: false);
+                    _store.Save((int)cursor, starNum, resIdx, false, result);
+                    cursor++; saved++;
+                    if (saved % 32 == 0)
+                    {
+                        lock (_store.ProgressLock) progress[key] = cursor;
+                        _store.SaveProgress(progress);
+                    }
+                    await Task.Delay(50, ct); // 单线程 + 让出 CPU
                 }
             }
-            catch (Exception ex)
-            {
-                _log.LogError(ex, "预热失败 {Key} seed={Cursor}", key, cursor);
-                cursor++;
-            }
-            finally { Gate.Release(); }
-            await Task.Delay(10, ct); // 让出 CPU 给用户请求
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { _log.LogError(ex, "预热失败 key={Key} seed={Cursor}", key, cursor); cursor++; }
+            lock (_store.ProgressLock) progress[key] = cursor;
+            _store.SaveProgress(progress);
+            _log.LogInformation("预热切换：key={Key} 下一种子 {Cursor}", key, cursor);
         }
     }
 }

@@ -121,6 +121,7 @@ public class SearchJob
     public int ResourceIndex { get; set; } = 4;
     public bool FastMode { get; set; } = true;
     public long FromSeed { get; set; }
+    public long ToSeed { get; set; } = -1;
     public volatile bool Stopped;
     public volatile bool Finished;
     public long Scanned;

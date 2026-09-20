@@ -5,6 +5,9 @@ namespace SearchSeed.Core;
 
 public class SeedService
 {
+    /// <summary>用户最近使用的资源倍率下标（预热跟随）；初始 10=无限资源</summary>
+    public volatile int LastUsedResourceIndex = 10;
+
     // 由宿主注入的持久化钩子（API 侧设置）
     public Func<int, int, int, bool, GalaxyResult, bool>? OnComputed { get; set; }
     public Func<int, int, int, bool, GalaxyResult?>? TryLoad { get; set; }
@@ -13,6 +16,7 @@ public class SeedService
 
     public GalaxyResult GetGalaxy(int seedId, int starNum = 64, int resourceIndex = 4, bool fastMode = false)
     {
+        LastUsedResourceIndex = resourceIndex;
         var key = (seedId, starNum, resourceIndex, fastMode);
         lock (Cache)
         {
