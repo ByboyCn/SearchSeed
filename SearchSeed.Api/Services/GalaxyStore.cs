@@ -41,8 +41,22 @@ public class GalaxyStore
 
     static string FileName(int seed, int starNum, int resIdx, bool fast) => $"s{seed}_{starNum}_{resIdx}_{(fast ? 1 : 0)}.json.gz";
 
+    // 剩余空间不足时抛出，调用方（预热）应暂停写盘
+    public class DiskFullException : Exception
+    {
+        public DiskFullException(string msg) : base(msg) { }
+    }
+
+    static void CheckDiskSpace(string path)
+    {
+        var drive = new DriveInfo(Path.GetPathRoot(Path.GetFullPath(path)));
+        if (drive.AvailableFreeSpace < 10L * 1024 * 1024 * 1024) // < 10GB
+            throw new DiskFullException($"磁盘剩余 {drive.AvailableFreeSpace / 1e9:F1}GB，低于 10GB，暂停写入蓝图缓存");
+    }
+
     public void Save(int seed, int starNum, int resIdx, bool fast, GalaxyResult result)
     {
+        CheckDiskSpace(Dir);
         var path = Path.Combine(Dir, FileName(seed, starNum, resIdx, fast));
         var tmp = path + ".tmp";
         using (var fs = File.Create(tmp))

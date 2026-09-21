@@ -17,6 +17,7 @@ builder.Services.AddSingleton<SeedService>(sp =>
 });
 builder.Services.AddSingleton<GalaxyStore>();
 builder.Services.AddHostedService<PrecomputeService>();
+builder.Services.Configure<HostOptions>(o => o.BackgroundServiceExceptionBehavior = BackgroundServiceExceptionBehavior.Ignore);
 builder.Services.AddSingleton<SearchService>();
 builder.Services.AddSingleton<BlueprintService>();
 var app = builder.Build();

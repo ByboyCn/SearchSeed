@@ -51,7 +51,8 @@ public class PrecomputeService : BackgroundService
                 }
             }
             catch (OperationCanceledException) { }
-            catch (Exception ex) { _log.LogError(ex, "预热失败 key={Key} seed={Cursor}", key, cursor); cursor++; }
+            catch (GalaxyStore.DiskFullException ex) { _log.LogWarning("预热暂停：{Msg}，10 分钟后重试", ex.Message); await Task.Delay(TimeSpan.FromMinutes(10), ct); }
+            catch (Exception ex) { _log.LogError(ex, "预热失败 key={Key} seed={Cursor}", key, cursor); cursor++; await Task.Delay(TimeSpan.FromSeconds(10), ct); }
             lock (_store.ProgressLock) progress[key] = cursor;
             _store.SaveProgress(progress);
             _log.LogInformation("预热切换：key={Key} 下一种子 {Cursor}", key, cursor);
