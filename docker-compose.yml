@@ -1,7 +1,11 @@
 services:
   searchseed:
     build: .
-    container_name: searchseed
+    container_name: searchseed2
     restart: unless-stopped
+    environment:
+      - Precompute__Enabled=true
+    volumes:
+      - ./data:/app/data
     ports:
       - "127.0.0.1:18090:8080"
